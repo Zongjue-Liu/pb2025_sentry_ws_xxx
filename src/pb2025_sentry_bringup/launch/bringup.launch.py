@@ -53,6 +53,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
     params_file = LaunchConfiguration("params_file")
+    target_tree = LaunchConfiguration("target_tree")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     use_robot_state_pub = LaunchConfiguration("use_robot_state_pub")
     use_rviz = LaunchConfiguration("use_rviz")
@@ -140,6 +141,12 @@ def generate_launch_description():
         "params_file",
         default_value=os.path.join(bringup_dir, "params", "node_params.yaml"),
         description="Full path to the ROS2 parameters file to use for all launched nodes",
+    )
+
+    declare_target_tree_cmd = DeclareLaunchArgument(
+        "target_tree",
+        default_value="rmul2026_ul_aggressive",
+        description="Behavior tree ID to execute",
     )
 
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
@@ -238,6 +245,7 @@ def generate_launch_description():
             "namespace": namespace,
             "use_sim_time": use_sim_time,
             "params_file": params_file,
+            "target_tree": target_tree,
             "log_level": log_level,
         }.items(),
     )
@@ -283,6 +291,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
+    ld.add_action(declare_target_tree_cmd)
     ld.add_action(declare_rviz_config_file_cmd)
     ld.add_action(declare_use_robot_state_pub_cmd)
     ld.add_action(declare_use_rviz_cmd)

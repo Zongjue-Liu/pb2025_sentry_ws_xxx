@@ -704,7 +704,7 @@ pb2025_sentry_behavior_server:
 pb2025_sentry_behavior_client:
   ros__parameters:
     use_sim_time: False
-    target_tree: rmul_2025
+    target_tree: rmul2026_ul_aggressive
 
 pb_teleop_twist_joy_node:
   ros__parameters:
