@@ -14,12 +14,8 @@
 
 #include "pb2025_sentry_behavior/pb2025_sentry_behavior_server.hpp"
 
-#include <filesystem>
-#include <fstream>
-
 #include "auto_aim_interfaces/msg/armors.hpp"
 #include "auto_aim_interfaces/msg/target.hpp"
-#include "behaviortree_cpp/xml_parsing.h"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "pb_rm_interfaces/msg/buff.hpp"
 #include "pb_rm_interfaces/msg/event_data.hpp"
@@ -118,15 +114,6 @@ int main(int argc, char * argv[])
   exec.add_node(action_server->node());
   exec.spin();
   exec.remove_node(action_server->node());
-
-  // Groot2 editor requires a model of your registered Nodes.
-  // You don't need to write that by hand, it can be automatically
-  // generated using the following command.
-  std::string xml_models = BT::writeTreeNodesModelXML(action_server->factory());
-
-  // Save the XML models to a file
-  std::ofstream file(std::filesystem::path(ROOT_DIR) / "behavior_trees" / "models.xml");
-  file << xml_models;
 
   rclcpp::shutdown();
 }

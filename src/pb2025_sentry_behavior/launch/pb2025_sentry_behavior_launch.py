@@ -33,9 +33,10 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     params_file = LaunchConfiguration("params_file")
     log_level = LaunchConfiguration("log_level")
+    target_tree = LaunchConfiguration("target_tree")
 
     # Create our own temporary YAML files that include substitutions
-    param_substitutions = {"use_sim_time": use_sim_time}
+    param_substitutions = {"use_sim_time": use_sim_time, "target_tree": target_tree}
 
     configured_params = ParameterFile(
         RewrittenYaml(
@@ -76,6 +77,12 @@ def generate_launch_description():
         "log_level", default_value="info", description="log level"
     )
 
+    declare_target_tree_cmd = DeclareLaunchArgument(
+        "target_tree",
+        default_value="rmul2026_ul_aggressive",
+        description="BehaviorTree ID to execute",
+    )
+
     bringup_cmd_group = GroupAction(
         [
             PushRosNamespace(namespace=namespace),
@@ -112,6 +119,7 @@ def generate_launch_description():
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(declare_target_tree_cmd)
 
     # Add the actions to launch the nodes
     ld.add_action(bringup_cmd_group)
