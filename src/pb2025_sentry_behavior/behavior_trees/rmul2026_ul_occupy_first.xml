@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="rmul2026_ul_occupy_first">
+    <KeepRunningUntilFailure>
+      <ForceSuccess>
+        <ReactiveSequence>
+          <ReactiveFallback name="GameStartGuard">
+            <IsGameStatus name="IsGameStart"
+                          expected_game_progress="4"
+                          min_remain_time="0"
+                          max_remain_time="420"
+                          key_port="{@referee_gameStatus}"/>
+            <ForceFailure>
+              <Sequence name="StopBeforeGameStart">
+                <PublishSpinSpeed spin_speed="0.0"
+                                  duration="0.0"
+                                  topic_name="cmd_spin"/>
+                <PublishTwist v_x="0.0"
+                              v_y="0.0"
+                              v_yaw="0.0"
+                              duration="0.0"
+                              topic_name="cmd_vel"/>
+              </Sequence>
+            </ForceFailure>
+          </ReactiveFallback>
+
+          <ReactiveFallback name="OccupyStatusGuard">
+            <IsStatusOK hp_min="220"
+                        heat_max="360"
+                        ammo_min="0"
+                        key_port="{@referee_robotStatus}"/>
+            <ForceFailure>
+              <Sequence name="ReturnHomeIfUnsafe">
+                <PublishSpinSpeed spin_speed="6.0"
+                                  duration="0.0"
+                                  topic_name="cmd_spin"/>
+                <PubNav2Goal goal="0.0;0.0;0.0"
+                             topic_name="goal_pose"/>
+              </Sequence>
+            </ForceFailure>
+          </ReactiveFallback>
+
+          <ReactiveFallback name="OccupyFirstULStrategy">
+            <Sequence name="LeaveStartArea">
+              <IsGameStatus expected_game_progress="4"
+                            min_remain_time="400"
+                            max_remain_time="420"
+                            key_port="{@referee_gameStatus}"/>
+              <PublishSpinSpeed spin_speed="6.0"
+                                duration="0.0"
+                                topic_name="cmd_spin"/>
+              <PubNav2Goal goal="1.0;0.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="OccupyBuffWindowEarly">
+              <IsGameStatus expected_game_progress="4"
+                            min_remain_time="230"
+                            max_remain_time="250"
+                            key_port="{@referee_gameStatus}"/>
+              <PublishSpinSpeed spin_speed="6.0"
+                                duration="0.0"
+                                topic_name="cmd_spin"/>
+              <PubNav2Goal goal="1.59;-0.771;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="OccupyBuffWindowLate">
+              <IsGameStatus expected_game_progress="4"
+                            min_remain_time="120"
+                            max_remain_time="140"
+                            key_port="{@referee_gameStatus}"/>
+              <PublishSpinSpeed spin_speed="6.0"
+                                duration="0.0"
+                                topic_name="cmd_spin"/>
+              <PubNav2Goal goal="1.59;-0.771;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="AttackNearEnemy">
+              <IsDetectEnemy max_distance="2.5"
+                             key_port="{@detector_armors}"/>
+              <PublishSpinSpeed spin_speed="6.0"
+                                duration="0.0"
+                                topic_name="cmd_spin"/>
+              <ReactiveFallback>
+                <Sequence>
+                  <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
+                                       tracker_port="{@tracker_target}"
+                                       goal="{attack_pose}"
+                                       topic_name="debug_attack_pose"/>
+                  <PubNav2Goal goal="{attack_pose}"
+                               topic_name="goal_pose"/>
+                </Sequence>
+                <PubNav2Goal goal="1.59;-0.771;0.0"
+                             topic_name="goal_pose"/>
+              </ReactiveFallback>
+            </Sequence>
+
+            <Sequence name="PatrolDefault">
+              <PublishSpinSpeed spin_speed="6.0"
+                                duration="0.0"
+                                topic_name="cmd_spin"/>
+              <PubNav2Goal goal="1.0;0.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+          </ReactiveFallback>
+        </ReactiveSequence>
+      </ForceSuccess>
+    </KeepRunningUntilFailure>
+  </BehaviorTree>
+</root>
