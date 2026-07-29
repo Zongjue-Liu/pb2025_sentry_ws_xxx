@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "geometry_msgs/msg/pose2_d.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 #include "nav2_behaviors/plugins/drive_on_heading.hpp"
 #include "nav2_msgs/action/back_up.hpp"
 #include "nav2_msgs/srv/get_costmap.hpp"
@@ -33,68 +35,56 @@ namespace pb_nav2_behaviors
 
 /**
  * @class pb_nav2_behaviors::BackUpFreeSpace
- * @brief An enhanced back_up action that move toward free space
+ * @brief Selects a free holonomic escape direction and validates the full robot footprint.
  */
 class BackUpFreeSpace : public nav2_behaviors::DriveOnHeading<nav2_msgs::action::BackUp>
 {
 public:
   BackUpFreeSpace() = default;
 
-  /**
-   * @brief Configuration of behavior action
-   */
   void onConfigure() override;
-
-  /**
-   * @brief Cleanup server on lifecycle transition
-   */
   void onCleanup() override;
-
-  /**
-   * @brief Initialization to run behavior
-   * @param command Goal to execute
-   * @return Status of behavior
-   */
   nav2_behaviors::Status onRun(const std::shared_ptr<const BackUpAction::Goal> command) override;
-
-  /**
-   * @brief Loop function to run behavior
-   * @return Status of behavior
-   */
   nav2_behaviors::Status onCycleUpdate() override;
 
 protected:
-  /**
-   * @brief Gather free points within a specified radius from the center in the costmap.
-   *
-   * This function iterates through the costmap and collects points that are free (costmap value is 0)
-   * and within the specified radius from the given center coordinates (center_x, center_y).
-   *
-   * @param costmap The costmap to search for free points.
-   * @param center_x The x-coordinate of the center point.
-   * @param center_y The y-coordinate of the center point.
-   * @param radius The radius within which to gather free points.
-   * @return A vector of points that are free and within the specified radius.
-   */
-  std::vector<geometry_msgs::msg::Point> gatherFreePoints(
-    const nav2_msgs::msg::Costmap & costmap, geometry_msgs::msg::Pose2D pose, float radius);
+  struct DirectionCandidate
+  {
+    double body_angle;
+    double map_angle;
+    double sector_center_map_angle;
+    double sector_width;
+    double center_error;
+  };
 
-  float findBestDirection(
-    const nav2_msgs::msg::Costmap & costmap, geometry_msgs::msg::Pose2D pose, float start_angle,
-    float end_angle, float radius, float angle_increment);
+  std::vector<DirectionCandidate> findDirectionCandidates(
+    const nav2_msgs::msg::Costmap & costmap, const geometry_msgs::msg::Pose2D & pose,
+    double max_search_radius) const;
+
+  bool isCostmapValid(const nav2_msgs::msg::Costmap & costmap) const;
+
+  bool isOmniTrajectoryCollisionFree(
+    double max_distance, const geometry_msgs::msg::Twist & command,
+    const geometry_msgs::msg::Pose2D & pose);
 
   void visualize(
-    geometry_msgs::msg::Pose2D pose, float radius, float first_safe_angle, float last_unsafe_angle);
+    const geometry_msgs::msg::Pose2D & pose, const std::string & frame_id, double radius,
+    double map_angle, double sector_width);
 
   rclcpp::Client<nav2_msgs::srv::GetCostmap>::SharedPtr costmap_client_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>>
     marker_pub_;
-  double twist_x_, twist_y_;
 
-  // parameters
-  std::string service_name_;
-  double max_radius_;
-  bool visualize_;
+  double twist_x_{0.0};
+  double twist_y_{0.0};
+
+  // Parameters under the "backup" behavior namespace.
+  std::string service_name_{"global_costmap/get_costmap"};
+  double max_radius_{1.0};
+  double angle_increment_{0.09817477042468103};  // pi / 32
+  int cost_threshold_{252};
+  double costmap_service_timeout_{1.0};
+  bool visualize_{false};
 };
 
 }  // namespace pb_nav2_behaviors
