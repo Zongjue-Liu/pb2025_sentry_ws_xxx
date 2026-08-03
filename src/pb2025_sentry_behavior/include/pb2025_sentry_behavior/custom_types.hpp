@@ -22,7 +22,7 @@
 namespace BT
 {
 template <>
-geometry_msgs::msg::PoseStamped convertFromString(StringView key)
+inline geometry_msgs::msg::PoseStamped convertFromString(StringView key)
 {
   auto parts = BT::splitString(key, ';');
   if (parts.size() == 7) {

@@ -26,6 +26,10 @@ ament_auto_find_build_dependencies()
 
 ament_auto_add_executable(pb2025_sentry_behavior_server src/pb2025_sentry_behavior_server.cpp)
 
+ament_auto_add_library(goal_pose_nav_bridge_core SHARED src/goal_pose_nav_bridge.cpp)
+ament_auto_add_executable(goal_pose_nav_bridge src/goal_pose_nav_bridge_main.cpp)
+target_link_libraries(goal_pose_nav_bridge goal_pose_nav_bridge_core)
+
 ament_auto_add_library(action_client SHARED
   src/pb2025_sentry_behavior_client.cpp
 )
@@ -50,6 +54,9 @@ list(APPEND plugin_libs is_attacked)
 
 ament_auto_add_library(is_detect_enemy SHARED plugins/condition/is_detect_enemy.cpp)
 list(APPEND plugin_libs is_detect_enemy)
+
+ament_auto_add_library(is_emergency_stop SHARED plugins/condition/is_emergency_stop.cpp)
+list(APPEND plugin_libs is_emergency_stop)
 
 ####### Actions #######
 ament_auto_add_library(send_nav2_goal SHARED plugins/action/send_nav2_goal.cpp)
@@ -83,6 +90,9 @@ list(APPEND plugin_libs rate_controller)
 
 ament_auto_add_library(tick_after_timeout_node SHARED plugins/decorator/tick_after_timeout_node.cpp)
 list(APPEND plugin_libs tick_after_timeout_node)
+
+ament_auto_add_library(run_once_per_epoch SHARED plugins/decorator/run_once_per_epoch.cpp)
+list(APPEND plugin_libs run_once_per_epoch)
 
 foreach(bt_plugin ${plugin_libs})
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)

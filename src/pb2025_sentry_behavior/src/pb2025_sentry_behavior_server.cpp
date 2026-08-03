@@ -17,6 +17,7 @@
 #include "auto_aim_interfaces/msg/armors.hpp"
 #include "auto_aim_interfaces/msg/target.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "pb2025_sentry_behavior/custom_types.hpp"
 #include "pb_rm_interfaces/msg/buff.hpp"
 #include "pb_rm_interfaces/msg/event_data.hpp"
 #include "pb_rm_interfaces/msg/game_robot_hp.hpp"
@@ -24,6 +25,7 @@
 #include "pb_rm_interfaces/msg/ground_robot_position.hpp"
 #include "pb_rm_interfaces/msg/rfid_status.hpp"
 #include "pb_rm_interfaces/msg/robot_status.hpp"
+#include "std_msgs/msg/bool.hpp"
 namespace pb2025_sentry_behavior
 {
 
@@ -37,29 +39,87 @@ void SentryBehaviorServer::subscribe(
   subscriptions_.push_back(sub);
 }
 
+void SentryBehaviorServer::gameStatusCallback(
+  const pb_rm_interfaces::msg::GameStatus::SharedPtr msg)
+{
+  std::lock_guard<std::mutex> lock(referee_state_mutex_);
+  const bool was_enabled = has_game_status_ &&
+                           last_game_progress_ == pb_rm_interfaces::msg::GameStatus::RUNNING &&
+                           !emergency_stop_;
+  has_game_status_ = true;
+  last_game_progress_ = msg->game_progress;
+  const bool is_enabled =
+    last_game_progress_ == pb_rm_interfaces::msg::GameStatus::RUNNING && !emergency_stop_;
+  if (!was_enabled && is_enabled) {
+    ++motion_epoch_;
+  }
+  globalBlackboard()->set("referee_gameStatus", *msg);
+  globalBlackboard()->set("motion_epoch", motion_epoch_);
+}
+
+void SentryBehaviorServer::emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg)
+{
+  std::lock_guard<std::mutex> lock(referee_state_mutex_);
+  const bool was_enabled = has_game_status_ &&
+                           last_game_progress_ == pb_rm_interfaces::msg::GameStatus::RUNNING &&
+                           !emergency_stop_;
+  emergency_stop_ = msg->data;
+  const bool is_enabled = has_game_status_ &&
+                          last_game_progress_ == pb_rm_interfaces::msg::GameStatus::RUNNING &&
+                          !emergency_stop_;
+  if (!was_enabled && is_enabled) {
+    ++motion_epoch_;
+  }
+  globalBlackboard()->set("referee_emergencyStop", emergency_stop_);
+  globalBlackboard()->set("motion_epoch", motion_epoch_);
+}
+
+void SentryBehaviorServer::detectorCallback(const auto_aim_interfaces::msg::Armors::SharedPtr msg)
+{
+  std::lock_guard<std::mutex> lock(referee_state_mutex_);
+  ++detector_sequence_;
+  globalBlackboard()->set("detector_armors", *msg);
+  globalBlackboard()->set("detector_sequence", detector_sequence_);
+}
+
 SentryBehaviorServer::SentryBehaviorServer(const rclcpp::NodeOptions & options)
 : TreeExecutionServer(options)
 {
   node()->declare_parameter("use_cout_logger", false);
   node()->get_parameter("use_cout_logger", use_cout_logger_);
+  const auto global_costmap_topic = node()->declare_parameter<std::string>(
+    "global_costmap_topic", "/red_standard_robot1/global_costmap/costmap");
+  const auto detector_topic = node()->declare_parameter<std::string>(
+    "detector_topic", "/red_standard_robot1/detector/armors");
+  const auto tracker_topic =
+    node()->declare_parameter<std::string>("tracker_topic", "/red_standard_robot1/tracker/target");
 
   subscribe<pb_rm_interfaces::msg::EventData>("referee/event_data", "referee_eventData");
   subscribe<pb_rm_interfaces::msg::GameRobotHP>("referee/all_robot_hp", "referee_allRobotHP");
-  subscribe<pb_rm_interfaces::msg::GameStatus>("referee/game_status", "referee_gameStatus");
+  auto game_status_sub = node()->create_subscription<pb_rm_interfaces::msg::GameStatus>(
+    "/referee/game_status", 10,
+    std::bind(&SentryBehaviorServer::gameStatusCallback, this, std::placeholders::_1));
+  subscriptions_.push_back(game_status_sub);
   subscribe<pb_rm_interfaces::msg::GroundRobotPosition>(
     "referee/ground_robot_position", "referee_groundRobotPosition");
   subscribe<pb_rm_interfaces::msg::RfidStatus>("referee/rfid_status", "referee_rfidStatus");
   subscribe<pb_rm_interfaces::msg::RobotStatus>("referee/robot_status", "referee_robotStatus");
   subscribe<pb_rm_interfaces::msg::Buff>("referee/buff", "referee_buff");
+  auto emergency_stop_sub = node()->create_subscription<std_msgs::msg::Bool>(
+    "/referee/emergency_stop", 10,
+    std::bind(&SentryBehaviorServer::emergencyStopCallback, this, std::placeholders::_1));
+  subscriptions_.push_back(emergency_stop_sub);
 
   auto detector_qos = rclcpp::SensorDataQoS();
-  subscribe<auto_aim_interfaces::msg::Armors>("detector/armors", "detector_armors", detector_qos);
+  auto detector_sub = node()->create_subscription<auto_aim_interfaces::msg::Armors>(
+    detector_topic, detector_qos,
+    std::bind(&SentryBehaviorServer::detectorCallback, this, std::placeholders::_1));
+  subscriptions_.push_back(detector_sub);
   auto tracker_qos = rclcpp::SensorDataQoS();
-  subscribe<auto_aim_interfaces::msg::Target>("tracker/target", "tracker_target", tracker_qos);
+  subscribe<auto_aim_interfaces::msg::Target>(tracker_topic, "tracker_target", tracker_qos);
 
   auto costmap_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
-  subscribe<nav_msgs::msg::OccupancyGrid>(
-    "global_costmap/costmap", "nav_globalCostmap", costmap_qos);
+  subscribe<nav_msgs::msg::OccupancyGrid>(global_costmap_topic, "nav_globalCostmap", costmap_qos);
 }
 
 bool SentryBehaviorServer::onGoalReceived(

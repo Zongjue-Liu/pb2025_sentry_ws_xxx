@@ -17,12 +17,17 @@
 
 #include <behaviortree_cpp/loggers/bt_cout_logger.h>
 
+#include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
+#include "auto_aim_interfaces/msg/armors.hpp"
 #include "behaviortree_ros2/tree_execution_server.hpp"
+#include "pb_rm_interfaces/msg/game_status.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace pb2025_sentry_behavior
 {
@@ -72,11 +77,20 @@ private:
   void subscribe(
     const std::string & topic, const std::string & bb_key,
     const rclcpp::QoS & qos = rclcpp::QoS(10));
+  void gameStatusCallback(const pb_rm_interfaces::msg::GameStatus::SharedPtr msg);
+  void emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg);
+  void detectorCallback(const auto_aim_interfaces::msg::Armors::SharedPtr msg);
 
   std::vector<std::shared_ptr<rclcpp::SubscriptionBase>> subscriptions_;
   std::shared_ptr<BT::StdCoutLogger> logger_cout_;
   uint32_t tick_count_;
   bool use_cout_logger_;
+  std::mutex referee_state_mutex_;
+  uint64_t motion_epoch_{0};
+  uint64_t detector_sequence_{0};
+  uint8_t last_game_progress_{pb_rm_interfaces::msg::GameStatus::NOT_START};
+  bool has_game_status_{false};
+  bool emergency_stop_{false};
 };
 
 }  // namespace pb2025_sentry_behavior

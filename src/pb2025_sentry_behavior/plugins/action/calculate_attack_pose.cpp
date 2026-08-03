@@ -14,9 +14,13 @@
 
 #include "pb2025_sentry_behavior/plugins/action/calculate_attack_pose.hpp"
 
+#include <algorithm>
+#include <stdexcept>
+
 #include "auto_aim_interfaces/msg/target.hpp"
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/robot_utils.hpp"
+#include "pb2025_sentry_behavior/custom_types.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 
@@ -34,6 +38,7 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
   declare_parameter_if_not_declared(node_, name + ".attack_radius", rclcpp::ParameterValue(3.0));
   declare_parameter_if_not_declared(node_, name + ".num_sectors", rclcpp::ParameterValue(36));
   declare_parameter_if_not_declared(node_, name + ".cost_threshold", rclcpp::ParameterValue(50));
+  declare_parameter_if_not_declared(node_, name + ".clearance_radius", rclcpp::ParameterValue(0.3));
   declare_parameter_if_not_declared(
     node_, name + ".robot_base_frame", rclcpp::ParameterValue("chassis"));
   declare_parameter_if_not_declared(
@@ -47,11 +52,18 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
   node_->get_parameter(name + ".attack_radius", params_.attack_radius);
   node_->get_parameter(name + ".num_sectors", params_.num_sectors);
   node_->get_parameter(name + ".cost_threshold", params_.cost_threshold);
+  node_->get_parameter(name + ".clearance_radius", params_.clearance_radius);
   node_->get_parameter(name + ".robot_base_frame", params_.robot_base_frame);
   node_->get_parameter(name + ".transform_tolerance", params_.transform_tolerance);
   node_->get_parameter(name + ".max_visualization_distance", params_.max_visualization_distance);
   node_->get_parameter(name + ".marker_scale_base", params_.marker_scale_base);
   node_->get_parameter(name + ".visualize", params_.visualize);
+
+  if (
+    params_.attack_radius <= 0.0 || params_.num_sectors <= 0 || params_.cost_threshold < 0 ||
+    params_.cost_threshold > 100 || params_.clearance_radius < 0.0) {
+    throw std::invalid_argument("Invalid CalculateAttackPose parameters");
+  }
 }
 
 BT::PortsList CalculateAttackPoseAction::providedPorts()
@@ -84,18 +96,17 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
   std::vector<Point> feasible_points;
   PoseStamped robot_pose;
 
-  // If tracker lost target, use last known center position
-  if (!tracker_target->tracking && tracker_target->id == "") {
+  // Keep the last valid attack goal while the detector's loss timeout is active.
+  if (!tracker_target->tracking) {
     RCLCPP_INFO(
       node_->get_logger(),
-      "Tracker target is not currently being tracked. Directing to last known position.");
-    if (enemy_on_costmap_.point.x == 0 && enemy_on_costmap_.point.y == 0) {
-      RCLCPP_WARN(node_->get_logger(), "No last known position to direct to.");
+      "Tracker target is not currently being tracked. Reusing the last attack pose.");
+    if (last_attack_pose_.header.frame_id.empty()) {
+      RCLCPP_WARN(node_->get_logger(), "No last attack pose to reuse.");
       return false;
     }
-    PoseStamped pose;
-    pose.pose.position = enemy_on_costmap_.point;
-    setOutput("goal", pose);
+    last_attack_pose_.header.stamp = node_->now();
+    setOutput("goal", last_attack_pose_);
   } else {
     // Transform enemy position
     PointStamped enemy_point;
@@ -131,6 +142,7 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
 
     // Create attack pose
     const auto attack_pose = createAttackPose(best_point, enemy_on_costmap_);
+    last_attack_pose_ = attack_pose;
     setOutput("goal", attack_pose);
 
     // Create visualization
@@ -190,25 +202,61 @@ std::vector<Point> CalculateAttackPoseAction::filterFeasiblePoints(
   const std::vector<Point> & candidates, const nav_msgs::msg::OccupancyGrid & costmap)
 {
   std::vector<Point> feasible_points;
-  const auto & info = costmap.info;
 
   for (const auto & p : candidates) {
-    const int cell_x = static_cast<int>((p.x - info.origin.position.x) / info.resolution);
-    const int cell_y = static_cast<int>((p.y - info.origin.position.y) / info.resolution);
-
-    if (
-      cell_x < 0 || cell_x >= static_cast<int>(info.width) || cell_y < 0 ||
-      cell_y >= static_cast<int>(info.height)) {
-      continue;
-    }
-
-    const int index = cell_y * info.width + cell_x;
-    const int8_t cost = costmap.data[index];
-    if (cost >= 0 && cost <= params_.cost_threshold) {
+    if (isPointFeasible(p, costmap, params_.cost_threshold, params_.clearance_radius)) {
       feasible_points.push_back(p);
     }
   }
   return feasible_points;
+}
+
+bool CalculateAttackPoseAction::isPointFeasible(
+  const Point & point, const nav_msgs::msg::OccupancyGrid & costmap, const int cost_threshold,
+  const double clearance_radius)
+{
+  const auto & info = costmap.info;
+  if (
+    info.resolution <= 0.0 || costmap.data.size() != info.width * info.height ||
+    cost_threshold < 0 || cost_threshold > 100 || clearance_radius < 0.0) {
+    return false;
+  }
+
+  const auto worldToCell = [&info](const double coordinate, const double origin) {
+    return static_cast<int>(std::floor((coordinate - origin) / info.resolution));
+  };
+  const int min_cell_x = worldToCell(point.x - clearance_radius, info.origin.position.x);
+  const int max_cell_x = worldToCell(point.x + clearance_radius, info.origin.position.x);
+  const int min_cell_y = worldToCell(point.y - clearance_radius, info.origin.position.y);
+  const int max_cell_y = worldToCell(point.y + clearance_radius, info.origin.position.y);
+
+  constexpr double kGridEpsilon = 1e-9;
+  for (int cell_y = min_cell_y; cell_y <= max_cell_y; ++cell_y) {
+    for (int cell_x = min_cell_x; cell_x <= max_cell_x; ++cell_x) {
+      if (
+        cell_x < 0 || cell_x >= static_cast<int>(info.width) || cell_y < 0 ||
+        cell_y >= static_cast<int>(info.height)) {
+        return false;
+      }
+
+      const double cell_min_x = info.origin.position.x + cell_x * info.resolution;
+      const double cell_max_x = cell_min_x + info.resolution;
+      const double cell_min_y = info.origin.position.y + cell_y * info.resolution;
+      const double cell_max_y = cell_min_y + info.resolution;
+      const double closest_x = std::clamp(point.x, cell_min_x, cell_max_x);
+      const double closest_y = std::clamp(point.y, cell_min_y, cell_max_y);
+      if (std::hypot(point.x - closest_x, point.y - closest_y) > clearance_radius + kGridEpsilon) {
+        continue;
+      }
+
+      const auto index = static_cast<size_t>(cell_y) * info.width + cell_x;
+      const int8_t cost = costmap.data[index];
+      if (cost < 0 || cost > cost_threshold) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 Point CalculateAttackPoseAction::selectBestPoint(

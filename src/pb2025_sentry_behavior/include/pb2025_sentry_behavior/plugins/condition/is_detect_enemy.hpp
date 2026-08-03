@@ -15,6 +15,8 @@
 #ifndef PB2025_SENTRY_BEHAVIOR__PLUGINS__CONDITION__IS_DETECT_ENEMY_HPP_
 #define PB2025_SENTRY_BEHAVIOR__PLUGINS__CONDITION__IS_DETECT_ENEMY_HPP_
 
+#include <chrono>
+#include <cstdint>
 #include <string>
 
 #include "auto_aim_interfaces/msg/armors.hpp"
@@ -45,6 +47,17 @@ private:
   BT::NodeStatus checkEnemy();
 
   rclcpp::Logger logger_ = rclcpp::get_logger("IsDetectEnemyCondition");
+  rclcpp::Clock clock_{RCL_SYSTEM_TIME};
+  uint64_t last_motion_epoch_{0};
+  uint64_t last_detector_sequence_{0};
+  bool has_motion_epoch_{false};
+  bool has_detector_sequence_{false};
+  bool has_last_detection_{false};
+  bool has_continuous_detection_{false};
+  bool last_message_has_enemy_{false};
+  std::chrono::steady_clock::time_point last_detector_update_time_;
+  std::chrono::steady_clock::time_point last_detection_time_;
+  std::chrono::steady_clock::time_point continuous_detection_start_time_;
 };
 }  // namespace pb2025_sentry_behavior
 

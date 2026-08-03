@@ -30,6 +30,8 @@ def generate_launch_description():
 
     # Create the launch configuration variables
     namespace = LaunchConfiguration("namespace")
+    params_root_key = LaunchConfiguration("params_root_key")
+    robot_namespace = LaunchConfiguration("robot_namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
     params_file = LaunchConfiguration("params_file")
     log_level = LaunchConfiguration("log_level")
@@ -41,7 +43,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key=params_root_key,
             param_rewrites=param_substitutions,
             convert_types=True,
         ),
@@ -67,6 +69,18 @@ def generate_launch_description():
         description="Use simulation (Gazebo) clock if true",
     )
 
+    declare_params_root_key_cmd = DeclareLaunchArgument(
+        "params_root_key",
+        default_value=namespace,
+        description="Namespace key used when rewriting the behavior parameter file",
+    )
+
+    declare_robot_namespace_cmd = DeclareLaunchArgument(
+        "robot_namespace",
+        default_value="red_standard_robot1",
+        description="Robot namespace that owns navigation, vision, and TF topics",
+    )
+
     declare_params_file_cmd = DeclareLaunchArgument(
         "params_file",
         default_value=os.path.join(bringup_dir, "params", "sentry_behavior.yaml"),
@@ -86,12 +100,20 @@ def generate_launch_description():
     bringup_cmd_group = GroupAction(
         [
             PushRosNamespace(namespace=namespace),
-            SetRemap("/tf", "tf"),
-            SetRemap("/tf_static", "tf_static"),
+            SetRemap("/tf", ["/", robot_namespace, "/tf"]),
+            SetRemap("/tf_static", ["/", robot_namespace, "/tf_static"]),
             Node(
                 package="pb2025_sentry_behavior",
                 executable="pb2025_sentry_behavior_server",
                 name="pb2025_sentry_behavior_server",
+                output="screen",
+                parameters=[configured_params],
+                arguments=["--ros-args", "--log-level", log_level],
+            ),
+            Node(
+                package="pb2025_sentry_behavior",
+                executable="goal_pose_nav_bridge",
+                name="goal_pose_nav_bridge",
                 output="screen",
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
@@ -116,7 +138,9 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
+    ld.add_action(declare_params_root_key_cmd)
     ld.add_action(declare_use_sim_time_cmd)
+    ld.add_action(declare_robot_namespace_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_log_level_cmd)
     ld.add_action(declare_target_tree_cmd)

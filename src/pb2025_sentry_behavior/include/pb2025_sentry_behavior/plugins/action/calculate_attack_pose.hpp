@@ -47,12 +47,17 @@ public:
 
   static BT::PortsList providedPorts();
 
+  static bool isPointFeasible(
+    const Point & point, const nav_msgs::msg::OccupancyGrid & costmap, int cost_threshold,
+    double clearance_radius);
+
 private:
   struct Parameters
   {
     double attack_radius;
     int num_sectors;
     int cost_threshold;
+    double clearance_radius;
     std::string robot_base_frame;
     double transform_tolerance;
     double max_visualization_distance;
@@ -83,6 +88,7 @@ private:
   Parameters params_;
 
   PointStamped enemy_on_costmap_;
+  PoseStamped last_attack_pose_;
 };
 
 }  // namespace pb2025_sentry_behavior
