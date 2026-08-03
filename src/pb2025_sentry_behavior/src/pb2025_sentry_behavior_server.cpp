@@ -25,6 +25,7 @@
 #include "pb_rm_interfaces/msg/ground_robot_position.hpp"
 #include "pb_rm_interfaces/msg/rfid_status.hpp"
 #include "pb_rm_interfaces/msg/robot_status.hpp"
+#include "pb_rm_interfaces/msg/sentry_posture_status.hpp"
 #include "std_msgs/msg/bool.hpp"
 namespace pb2025_sentry_behavior
 {
@@ -93,6 +94,10 @@ SentryBehaviorServer::SentryBehaviorServer(const rclcpp::NodeOptions & options)
     "detector_topic", "/red_standard_robot1/detector/armors");
   const auto tracker_topic =
     node()->declare_parameter<std::string>("tracker_topic", "/red_standard_robot1/tracker/target");
+  const auto posture_status_topic = node()->declare_parameter<std::string>(
+    "posture_status_topic", "/referee/sentry_posture_status");
+  const auto reached_goal_topic =
+    node()->declare_parameter<std::string>("reached_goal_topic", "/navigation/reached_goal");
 
   subscribe<pb_rm_interfaces::msg::EventData>("referee/event_data", "referee_eventData");
   subscribe<pb_rm_interfaces::msg::GameRobotHP>("referee/all_robot_hp", "referee_allRobotHP");
@@ -105,6 +110,12 @@ SentryBehaviorServer::SentryBehaviorServer(const rclcpp::NodeOptions & options)
   subscribe<pb_rm_interfaces::msg::RfidStatus>("referee/rfid_status", "referee_rfidStatus");
   subscribe<pb_rm_interfaces::msg::RobotStatus>("referee/robot_status", "referee_robotStatus");
   subscribe<pb_rm_interfaces::msg::Buff>("referee/buff", "referee_buff");
+  subscribe<pb_rm_interfaces::msg::SentryPostureStatus>(
+    posture_status_topic, "referee_sentryPostureStatus");
+  auto reached_goal_qos = rclcpp::QoS(1).transient_local().reliable();
+  subscribe<geometry_msgs::msg::PoseStamped>(
+    reached_goal_topic, "navigation_reachedGoal", reached_goal_qos);
+
   auto emergency_stop_sub = node()->create_subscription<std_msgs::msg::Bool>(
     "/referee/emergency_stop", 10,
     std::bind(&SentryBehaviorServer::emergencyStopCallback, this, std::placeholders::_1));

@@ -9,6 +9,8 @@ pb2025_sentry_behavior_server:
     global_costmap_topic: /red_standard_robot1/global_costmap/costmap
     detector_topic: /red_standard_robot1/detector/armors
     tracker_topic: /red_standard_robot1/tracker/target
+    posture_status_topic: /referee/sentry_posture_status
+    reached_goal_topic: /navigation/reached_goal
 
     plugins:
       - pb2025_sentry_behavior/bt_plugins

@@ -26,6 +26,7 @@
 #include "auto_aim_interfaces/msg/armors.hpp"
 #include "behaviortree_ros2/tree_execution_server.hpp"
 #include "pb_rm_interfaces/msg/game_status.hpp"
+#include "pb_rm_interfaces/msg/sentry_posture_status.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 

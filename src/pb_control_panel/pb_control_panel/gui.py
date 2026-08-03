@@ -31,6 +31,15 @@ GAME_PROGRESS_ITEMS = [
     ("5 GAME_OVER", 5),
 ]
 
+POSTURE_ITEMS = [
+    ("1 attack", 1),
+    ("2 defense", 2),
+    ("3 mobile", 3),
+    ("4 enhanced attack", 4),
+    ("5 enhanced defense", 5),
+    ("6 enhanced mobile", 6),
+]
+
 
 class PbControlPanelGui(QMainWindow):
     PREPARATION_DELAY_MS = 500
@@ -66,6 +75,20 @@ class PbControlPanelGui(QMainWindow):
         self.blue_outpost_hp = self._spin_box(0, 2000, 1000)
         self.blue_base_hp = self._spin_box(0, 5000, 1000)
 
+        self.posture_request = self._combo_box(POSTURE_ITEMS, current_value=3)
+        self.manual_posture_override = QCheckBox("manual override")
+        self.manual_posture_override.toggled.connect(
+            self.publisher.set_manual_posture_override
+        )
+        self.posture_request_button = QPushButton("request posture")
+        self.posture_request_button.clicked.connect(self.request_posture)
+        self.posture_request_button.setEnabled(
+            self.publisher.posture_simulation_enabled
+        )
+        self.posture_current_label = QLabel()
+        self.posture_base_time_label = QLabel()
+        self.posture_enhanced_time_label = QLabel()
+
         self.status_label = QLabel("not published yet")
         self.start_button = QPushButton("start new match")
         self.start_button.clicked.connect(self.start_match)
@@ -83,6 +106,7 @@ class PbControlPanelGui(QMainWindow):
         form_layout.addWidget(self._robot_group())
         form_layout.addWidget(self._rfid_group())
         form_layout.addWidget(self._hp_group())
+        form_layout.addWidget(self._posture_group())
 
         form_widget = QWidget()
         form_widget.setLayout(form_layout)
@@ -119,6 +143,7 @@ class PbControlPanelGui(QMainWindow):
         )
 
         self.apply_to_publisher()
+        self._sync_posture_widgets()
 
     def _combo_box(self, items, current_value):
         combo_box = QComboBox()
@@ -182,6 +207,18 @@ class PbControlPanelGui(QMainWindow):
         group.setLayout(layout)
         return group
 
+    def _posture_group(self):
+        group = QGroupBox("sentry_posture")
+        layout = QFormLayout()
+        layout.addRow("", self.manual_posture_override)
+        layout.addRow("request", self.posture_request)
+        layout.addRow("", self.posture_request_button)
+        layout.addRow("current", self.posture_current_label)
+        layout.addRow("base remaining", self.posture_base_time_label)
+        layout.addRow("enhanced remaining", self.posture_enhanced_time_label)
+        group.setLayout(layout)
+        return group
+
     def apply_to_publisher(self):
         self.publisher.set_game_status(
             self.game_progress.currentData(),
@@ -216,6 +253,8 @@ class PbControlPanelGui(QMainWindow):
     def start_match(self):
         if self.match_start_phase is not None:
             return
+        self.manual_posture_override.setChecked(False)
+        self.publisher.set_manual_posture_override(False)
         self.publisher.set_emergency_stop(self.emergency_stop.isChecked())
         self.publisher.start_preparation()
         self.match_start_phase = "preparation"
@@ -284,10 +323,45 @@ class PbControlPanelGui(QMainWindow):
         self.stage_remain_time.setValue(self.publisher.game_status.stage_remain_time)
         self.countdown_enabled.setChecked(self.publisher.countdown_enabled)
 
+    def request_posture(self):
+        accepted, message = self.publisher.request_posture(
+            self.posture_request.currentData()
+        )
+        self.publisher.publish_once()
+        self._sync_posture_widgets()
+        prefix = "accepted" if accepted else "rejected"
+        self.status_label.setText("posture {}: {}".format(prefix, message))
+
+    def _sync_posture_widgets(self):
+        state = self.publisher.posture_state
+        effective_posture = state.effective_posture
+        posture_name = state.POSTURE_NAMES[effective_posture]
+        weakened = "weakened" if state.is_weakened else "normal"
+        self.posture_current_label.setText(
+            "{} / {} / cooldown {:.1f}s".format(
+                posture_name, weakened, state.cooldown_remaining
+            )
+        )
+        self.posture_base_time_label.setText(
+            "A {:.0f}s  D {:.0f}s  M {:.0f}s".format(
+                state.base_remaining[state.ATTACK],
+                state.base_remaining[state.DEFENSE],
+                state.base_remaining[state.MOBILE],
+            )
+        )
+        self.posture_enhanced_time_label.setText(
+            "A {:.0f}s  D {:.0f}s  M {:.0f}s".format(
+                state.enhanced_remaining[state.ATTACK],
+                state.enhanced_remaining[state.DEFENSE],
+                state.enhanced_remaining[state.MOBILE],
+            )
+        )
+
     def on_timer(self):
         rclpy.spin_once(self.publisher, timeout_sec=0.0)
         self.publisher.tick_countdown()
         self._sync_game_widgets()
+        self._sync_posture_widgets()
         self.publisher.publish_once()
         self.status_label.setText(
             "publishing: game_progress={} remain_time={}".format(

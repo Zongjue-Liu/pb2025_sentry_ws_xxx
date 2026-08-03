@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root BTCPP_format="4" project_name="PB2025_UL">
+<root BTCPP_format="4" project_name="PB2025_Sentry">
   <include path="rmul2026_ul_aggressive.xml"/>
   <include path="rmul2026_ul_conservative.xml"/>
   <include path="rmul2026_ul_occupy_first.xml"/>
+  <include path="rmuc2026_posture_strategy.xml"/>
 
   <TreeNodesModel>
     <Condition ID="IsGameStatus">
@@ -23,7 +24,32 @@
       <input_port name="key_port" default="{@detector_armors}" type="auto_aim_interfaces::msg::Armors"/>
       <input_port name="armor_id" default="1;2;3;4;5;7" type="std::vector&lt;int&gt;"/>
       <input_port name="max_distance" default="8.0" type="float"/>
+      <input_port name="lost_timeout" default="0.0" type="float"/>
+      <input_port name="message_timeout" default="0.5" type="float"/>
+      <input_port name="minimum_detection_time" default="0.0" type="float"/>
+      <input_port name="detector_sequence" default="{@detector_sequence}" type="uint64_t"/>
+      <input_port name="motion_epoch" default="{@motion_epoch}" type="uint64_t"/>
     </Condition>
+
+    <Condition ID="IsPostureAvailable">
+      <input_port name="status" default="{@referee_sentryPostureStatus}" type="pb_rm_interfaces::msg::SentryPostureStatus"/>
+      <input_port name="posture" default="3" type="unsigned"/>
+      <input_port name="minimum_enhanced_time" default="0.1" type="double"/>
+    </Condition>
+
+    <Condition ID="IsGoalReached">
+      <input_port name="reached_goal" default="{@navigation_reachedGoal}" type="geometry_msgs::msg::PoseStamped"/>
+      <input_port name="goal" default="0;0;0" type="geometry_msgs::msg::PoseStamped"/>
+      <input_port name="position_tolerance" default="0.2" type="double"/>
+    </Condition>
+
+    <Condition ID="IsEmergencyStop">
+      <input_port name="emergency_stop" default="{@referee_emergencyStop}" type="bool"/>
+    </Condition>
+
+    <Decorator ID="RunOncePerEpoch">
+      <input_port name="epoch" default="{@motion_epoch}" type="uint64_t"/>
+    </Decorator>
 
     <Condition ID="IsRfidDetected">
       <input_port name="key_port" default="{@referee_rfidStatus}" type="pb_rm_interfaces::msg::RfidStatus"/>
@@ -57,6 +83,11 @@
       <input_port name="tracker_port" default="{@tracker_target}" type="auto_aim_interfaces::msg::Target"/>
       <input_port name="topic_name" default="debug_attack_pose" type="std::string"/>
       <output_port name="goal" default="{attack_pose}" type="geometry_msgs::msg::PoseStamped"/>
+    </Action>
+
+    <Action ID="PublishPostureRequest">
+      <input_port name="topic_name" default="/referee/sentry_posture_command" type="std::string"/>
+      <input_port name="posture" default="3" type="unsigned"/>
     </Action>
   </TreeNodesModel>
 </root>

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="rmuc2026_posture_strategy">
+    <KeepRunningUntilFailure>
+      <ForceSuccess>
+        <ReactiveSequence>
+          <ReactiveFallback name="GameStartGuard">
+            <IsGameStatus expected_game_progress="4"
+                          min_remain_time="0"
+                          max_remain_time="420"
+                          key_port="{@referee_gameStatus}"/>
+            <AlwaysFailure/>
+          </ReactiveFallback>
+
+          <ReactiveFallback name="EmergencyStopGuard">
+            <Inverter>
+              <IsEmergencyStop emergency_stop="{@referee_emergencyStop}"/>
+            </Inverter>
+            <AlwaysFailure/>
+          </ReactiveFallback>
+
+          <ForceSuccess name="InitializeRmucMotionEpoch">
+            <Fallback>
+              <RunOncePerEpoch epoch="{@motion_epoch}">
+                <PublishSpinSpeed spin_speed="6.0"
+                                  duration="0.0"
+                                  topic_name="cmd_spin"/>
+              </RunOncePerEpoch>
+              <AlwaysFailure/>
+            </Fallback>
+          </ForceSuccess>
+
+          <ReactiveFallback name="RmucPostureAndNavigationStrategy">
+            <Sequence name="CriticalHealthRetreat">
+              <Inverter>
+                <IsStatusOK hp_min="120"
+                            heat_max="65535"
+                            ammo_min="0"
+                            key_port="{@referee_robotStatus}"/>
+              </Inverter>
+              <PublishPostureRequest posture="3"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="0.0;0.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="EnhancedDefenseUnderPressure">
+              <IsAttacked key_port="{@referee_robotStatus}"/>
+              <Inverter>
+                <IsStatusOK hp_min="220"
+                            heat_max="65535"
+                            ammo_min="0"
+                            key_port="{@referee_robotStatus}"/>
+              </Inverter>
+              <IsPostureAvailable status="{@referee_sentryPostureStatus}"
+                                  posture="5"
+                                  minimum_enhanced_time="0.1"/>
+              <PublishPostureRequest posture="5"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="5.0;-3.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="BaseDefenseUnderPressure">
+              <IsAttacked key_port="{@referee_robotStatus}"/>
+              <Inverter>
+                <IsStatusOK hp_min="220"
+                            heat_max="65535"
+                            ammo_min="0"
+                            key_port="{@referee_robotStatus}"/>
+              </Inverter>
+              <PublishPostureRequest posture="2"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="5.0;-3.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="EnhancedAttackStableNearEnemy">
+              <IsStatusOK hp_min="220"
+                          heat_max="65535"
+                          ammo_min="1"
+                          key_port="{@referee_robotStatus}"/>
+              <IsDetectEnemy max_distance="3.0"
+                             lost_timeout="0.0"
+                             message_timeout="0.5"
+                             minimum_detection_time="0.5"
+                             detection_gap_tolerance="0.2"
+                             detector_sequence="{@detector_sequence}"
+                             motion_epoch="{@motion_epoch}"
+                             key_port="{@detector_armors}"/>
+              <IsPostureAvailable status="{@referee_sentryPostureStatus}"
+                                  posture="4"
+                                  minimum_enhanced_time="0.1"/>
+              <PublishPostureRequest posture="4"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <ReactiveFallback>
+                <Sequence>
+                  <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
+                                       tracker_port="{@tracker_target}"
+                                       goal="{enhanced_attack_pose}"
+                                       topic_name="debug_attack_pose"/>
+                  <PubNav2Goal goal="{enhanced_attack_pose}"
+                               topic_name="goal_pose"/>
+                </Sequence>
+                <PubNav2Goal goal="5.0;-3.0;0.0"
+                             topic_name="goal_pose"/>
+              </ReactiveFallback>
+            </Sequence>
+
+            <Sequence name="AttackAndChaseEnemy">
+              <IsDetectEnemy max_distance="8.0"
+                             lost_timeout="2.0"
+                             message_timeout="0.5"
+                             minimum_detection_time="0.0"
+                             detector_sequence="{@detector_sequence}"
+                             motion_epoch="{@motion_epoch}"
+                             key_port="{@detector_armors}"/>
+              <PublishPostureRequest posture="1"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <ReactiveFallback>
+                <Sequence>
+                  <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
+                                       tracker_port="{@tracker_target}"
+                                       goal="{attack_pose}"
+                                       topic_name="debug_attack_pose"/>
+                  <PubNav2Goal goal="{attack_pose}"
+                               topic_name="goal_pose"/>
+                </Sequence>
+                <PubNav2Goal goal="5.0;-3.0;0.0"
+                             topic_name="goal_pose"/>
+              </ReactiveFallback>
+            </Sequence>
+
+            <Sequence name="OpeningEnhancedMove">
+              <IsGameStatus expected_game_progress="4"
+                            min_remain_time="405"
+                            max_remain_time="420"
+                            key_port="{@referee_gameStatus}"/>
+              <Inverter>
+                <IsGoalReached reached_goal="{@navigation_reachedGoal}"
+                               goal="5.0;-3.0;0.0"
+                               position_tolerance="0.25"/>
+              </Inverter>
+              <IsPostureAvailable status="{@referee_sentryPostureStatus}"
+                                  posture="6"
+                                  minimum_enhanced_time="0.1"/>
+              <PublishPostureRequest posture="6"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="5.0;-3.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="ReturnToForwardDefense">
+              <Inverter>
+                <IsGoalReached reached_goal="{@navigation_reachedGoal}"
+                               goal="5.0;-3.0;0.0"
+                               position_tolerance="0.25"/>
+              </Inverter>
+              <PublishPostureRequest posture="3"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="5.0;-3.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+
+            <Sequence name="HoldForwardDefense">
+              <PublishPostureRequest posture="2"
+                                     topic_name="/referee/sentry_posture_command"/>
+              <PubNav2Goal goal="5.0;-3.0;0.0"
+                           topic_name="goal_pose"/>
+            </Sequence>
+          </ReactiveFallback>
+        </ReactiveSequence>
+      </ForceSuccess>
+    </KeepRunningUntilFailure>
+  </BehaviorTree>
+</root>

@@ -9,8 +9,12 @@ from pb_rm_interfaces.msg import GameStatus
 from pb_rm_interfaces.msg import GroundRobotPosition
 from pb_rm_interfaces.msg import RfidStatus
 from pb_rm_interfaces.msg import RobotStatus
+from pb_rm_interfaces.msg import SentryPostureCommand
+from pb_rm_interfaces.msg import SentryPostureStatus
 from rmoss_interfaces.msg import RefereeCmd
 from std_msgs.msg import Bool
+
+from pb_control_panel.posture import SentryPostureStateMachine
 
 
 class PbControlPanelPublisher(Node):
@@ -43,8 +47,20 @@ class PbControlPanelPublisher(Node):
         self.referee_cmd_pub = self.create_publisher(
             RefereeCmd, "/referee_system/referee_cmd", 10
         )
+        self.sentry_posture_status_pub = self.create_publisher(
+            SentryPostureStatus, "/referee/sentry_posture_status", 10
+        )
+        self.sentry_posture_command_sub = self.create_subscription(
+            SentryPostureCommand,
+            "/referee/sentry_posture_command",
+            self._posture_command_callback,
+            10,
+        )
 
         self.match_duration = self.declare_parameter("match_duration", 300).value
+        self.posture_simulation_enabled = self.declare_parameter(
+            "posture_simulation_enabled", False
+        ).value
         if self.match_duration <= 0:
             raise ValueError("match_duration must be positive")
 
@@ -92,6 +108,12 @@ class PbControlPanelPublisher(Node):
         self.event_data = EventData()
         self.buff = Buff()
         self.ground_robot_position = GroundRobotPosition()
+        self.posture_state = SentryPostureStateMachine()
+        self.sentry_posture_status = SentryPostureStatus()
+        self.posture_state.fill_status_message(self.sentry_posture_status)
+        self.manual_posture_override = False
+        self._manual_override_warning_emitted = False
+
         self.countdown_enabled = False
 
     def set_game_status(self, game_progress, stage_remain_time):
@@ -101,7 +123,12 @@ class PbControlPanelPublisher(Node):
     def set_emergency_stop(self, enabled):
         self.emergency_stop.data = enabled
 
+    def set_manual_posture_override(self, enabled):
+        self.manual_posture_override = bool(enabled)
+        self._manual_override_warning_emitted = False
+
     def start_preparation(self):
+        self.posture_state.reset_match()
         self.game_status.game_progress = GameStatus.PREPARATION
         self.game_status.stage_remain_time = 0
         self.countdown_enabled = False
@@ -195,10 +222,35 @@ class PbControlPanelPublisher(Node):
         self.game_robot_hp.blue_base_hp = blue_base_hp
 
     def tick_countdown(self):
+        is_running = self.game_status.game_progress == GameStatus.RUNNING
+        if self.posture_simulation_enabled:
+            self.posture_state.advance(1.0, is_running)
         if self.countdown_enabled and self.game_status.stage_remain_time > 0:
             self.game_status.stage_remain_time -= 1
         elif self.countdown_enabled and self.game_status.stage_remain_time == 0:
             self.game_status.game_progress = GameStatus.GAME_OVER
+
+    def request_posture(self, posture):
+        if not self.posture_simulation_enabled:
+            return False, "posture simulation is disabled for this launch"
+        is_running = self.game_status.game_progress == GameStatus.RUNNING
+        accepted, message = self.posture_state.request(posture, is_running)
+        log_message = "Sentry posture request {}: {}".format(posture, message)
+        if accepted:
+            self.get_logger().info(log_message)
+        else:
+            self.get_logger().warning(log_message)
+        return accepted, message
+
+    def _posture_command_callback(self, message):
+        if self.manual_posture_override:
+            if not self._manual_override_warning_emitted:
+                self.get_logger().warning(
+                    "Ignoring autonomous posture requests while manual override is enabled"
+                )
+                self._manual_override_warning_emitted = True
+            return
+        self.request_posture(message.posture)
 
     def publish_once(self):
         self.game_status_pub.publish(self.game_status)
@@ -209,3 +261,5 @@ class PbControlPanelPublisher(Node):
         self.buff_pub.publish(self.buff)
         self.ground_robot_position_pub.publish(self.ground_robot_position)
         self.emergency_stop_pub.publish(self.emergency_stop)
+        self.posture_state.fill_status_message(self.sentry_posture_status)
+        self.sentry_posture_status_pub.publish(self.sentry_posture_status)
