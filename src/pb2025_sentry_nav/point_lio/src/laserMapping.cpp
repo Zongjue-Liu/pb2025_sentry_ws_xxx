@@ -10,6 +10,7 @@
 
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
+#include <std_msgs/msg/empty.hpp>
 
 #include "li_initialization.h"
 
@@ -28,7 +29,8 @@ bool init_map = false, flg_first_scan = true;
 // Time Log Variables
 double match_time = 0, solve_time = 0, propag_time = 0, update_time = 0;
 
-bool flg_reset = false, flg_exit = false;
+std::atomic_bool flg_reset{false};
+bool flg_exit = false;
 
 //surf feature in map
 PointCloudXYZI::Ptr feats_undistort(new PointCloudXYZI());
@@ -379,6 +381,11 @@ int main(int argc, char ** argv)
   }
   auto sub_imu =
     nh->create_subscription<sensor_msgs::msg::Imu>(imu_topic, rclcpp::SensorDataQoS(), imu_cbk);
+  auto sub_reset = nh->create_subscription<std_msgs::msg::Empty>(
+    "point_lio/reset", 10, [](const std_msgs::msg::Empty::SharedPtr) {
+      RCLCPP_INFO(LOGGER, "Point-LIO reset requested");
+      flg_reset = true;
+    });
   auto pub_laser_cloud_full_res =
     nh->create_publisher<sensor_msgs::msg::PointCloud2>("cloud_registered", 20);
   auto pub_laser_cloud_full_res_body =
@@ -397,30 +404,54 @@ int main(int argc, char ** argv)
   while (rclcpp::ok()) {
     if (flg_exit) break;
     executor.spin_some();
-    if (sync_packages(Measures)) {
-      if (flg_reset) {
-        RCLCPP_WARN(LOGGER, "reset when rosbag play back");
-        p_imu->Reset();
-        feats_undistort.reset(new PointCloudXYZI());
-        if (use_imu_as_input) {
-          // state_in = kf_input.get_x();
-          state_in = state_input();
-          kf_input.change_P(P_init);
-        } else {
-          // state_out = kf_output.get_x();
-          state_out = state_output();
-          kf_output.change_P(P_init_output);
-        }
-        flg_first_scan = true;
-        is_first_frame = true;
-        flg_reset = false;
-        init_map = false;
+    if (flg_reset.exchange(false)) {
+      RCLCPP_WARN(LOGGER, "Resetting Point-LIO state, sensor buffers, and local map");
 
-        {
-          ivox_.reset(new IVoxType(ivox_options_));
-        }
+      p_imu->Reset();
+      state_in = state_input();
+      state_out = state_output();
+      kf_input.x_ = state_in;
+      kf_output.x_ = state_out;
+      if (extrinsic_est_en) {
+        kf_input.x_.offset_R_L_I = Lidar_R_wrt_IMU;
+        kf_input.x_.offset_T_L_I = Lidar_T_wrt_IMU;
+        kf_output.x_.offset_R_L_I = Lidar_R_wrt_IMU;
+        kf_output.x_.offset_T_L_I = Lidar_T_wrt_IMU;
       }
+      kf_input.x_.gravity << VEC_FROM_ARRAY(gravity);
+      kf_output.x_.gravity << VEC_FROM_ARRAY(gravity);
+      kf_input.change_P(P_init);
+      kf_output.change_P(P_init_output);
 
+      feats_undistort.reset(new PointCloudXYZI());
+      feats_down_body_space.reset(new PointCloudXYZI());
+      init_feats_world.reset(new PointCloudXYZI());
+      depth_feats_world.clear();
+      ivox_.reset(new IVoxType(ivox_options_));
+      path.poses.clear();
+
+      lidar_buffer.clear();
+      time_buffer.clear();
+      imu_deque.clear();
+      ptr_con->clear();
+      lidar_pushed = false;
+      imu_pushed = false;
+      frame_ct = 0;
+      last_timestamp_lidar = -1.0;
+      last_timestamp_imu = -1.0;
+      lidar_end_time = 0.0;
+      first_lidar_time = 0.0;
+      first_imu_time = 0.0;
+      time_update_last = 0.0;
+      time_current = 0.0;
+      time_predict_last_const = 0.0;
+      t_last = 0.0;
+      flg_first_scan = true;
+      is_first_frame = true;
+      init_map = false;
+      continue;
+    }
+    if (sync_packages(Measures)) {
       if (flg_first_scan) {
         first_lidar_time = Measures.lidar_beg_time;
         flg_first_scan = false;

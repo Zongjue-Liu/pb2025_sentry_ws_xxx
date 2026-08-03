@@ -1,11 +1,14 @@
 #pragma once
 
+#include <atomic>
+
 #include <common_lib.h>
 
 #include "Estimator.h"
 #define MAXN (720000)
 
 extern bool data_accum_finished, data_accum_start, online_calib_finish, refine_print;
+extern std::atomic_bool flg_reset;
 extern int frame_num_init;
 extern double time_lag_IMU_wtr_lidar, move_start_time,
   online_calib_starts_time;  //, mean_acc_norm = 9.81;

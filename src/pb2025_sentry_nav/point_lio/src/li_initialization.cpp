@@ -30,7 +30,8 @@ void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::SharedPtr & msg)
   scan_count++;
   double preprocess_start_time = omp_get_wtime();
   if (rclcpp::Time(msg->header.stamp).seconds() < last_timestamp_lidar) {
-    RCLCPP_ERROR(rclcpp::get_logger("li_initialization"), "lidar loop back, clear buffer");
+    RCLCPP_WARN(rclcpp::get_logger("li_initialization"), "lidar loop back, resetting Point-LIO");
+    flg_reset = true;
     return;
   }
 
@@ -93,7 +94,8 @@ void livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::SharedPtr & msg)
   double preprocess_start_time = omp_get_wtime();
   scan_count++;
   if (rclcpp::Time(msg->header.stamp).seconds() < last_timestamp_lidar) {
-    RCLCPP_ERROR(rclcpp::get_logger("li_initialization"), "lidar loop back, clear buffer");
+    RCLCPP_WARN(rclcpp::get_logger("li_initialization"), "lidar loop back, resetting Point-LIO");
+    flg_reset = true;
     return;
   }
 
@@ -164,7 +166,8 @@ void imu_cbk(const sensor_msgs::msg::Imu::ConstSharedPtr & msg_in)
   // printf("time_diff%f, %f, %f\n", last_timestamp_imu - timestamp, last_timestamp_imu, timestamp);
 
   if (timestamp < last_timestamp_imu) {
-    RCLCPP_ERROR(rclcpp::get_logger("li_initialization"), "imu loop back, clear deque");
+    RCLCPP_WARN(rclcpp::get_logger("li_initialization"), "imu loop back, resetting Point-LIO");
+    flg_reset = true;
     // imu_deque.shrink_to_fit();
     // std::cout << "check time:" << timestamp << ";" << last_timestamp_imu << '\n';
     // printf("time_diff%f, %f, %f\n", last_timestamp_imu - timestamp, last_timestamp_imu, timestamp);

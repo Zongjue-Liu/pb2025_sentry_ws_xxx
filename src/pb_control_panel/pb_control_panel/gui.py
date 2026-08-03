@@ -43,6 +43,7 @@ POSTURE_ITEMS = [
 
 class PbControlPanelGui(QMainWindow):
     PREPARATION_DELAY_MS = 500
+    LOCALIZATION_RESET_DELAY_MS = 3000
     SELF_CHECKING_DELAY_MS = 1000
     COUNTDOWN_DELAY_MS = 1000
 
@@ -279,6 +280,11 @@ class PbControlPanelGui(QMainWindow):
     def _advance_match_start(self):
         self.match_phase_timer.stop()
         if self.match_start_phase == "preparation":
+            self.publisher.reset_localization()
+            self.match_start_phase = "localization_reset"
+            delay = self.LOCALIZATION_RESET_DELAY_MS
+            self.status_label.setText("resetting localization")
+        elif self.match_start_phase == "localization_reset":
             self.publisher.start_self_checking()
             self.match_start_phase = "self_checking"
             delay = self.SELF_CHECKING_DELAY_MS

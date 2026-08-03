@@ -13,6 +13,7 @@ from pb_rm_interfaces.msg import SentryPostureCommand
 from pb_rm_interfaces.msg import SentryPostureStatus
 from rmoss_interfaces.msg import RefereeCmd
 from std_msgs.msg import Bool
+from std_msgs.msg import Empty
 
 from pb_control_panel.posture import SentryPostureStateMachine
 
@@ -43,6 +44,12 @@ class PbControlPanelPublisher(Node):
         )
         self.emergency_stop_pub = self.create_publisher(
             Bool, "referee/emergency_stop", 10
+        )
+        localization_reset_topic = self.declare_parameter(
+            "localization_reset_topic", "/red_standard_robot1/point_lio/reset"
+        ).value
+        self.localization_reset_pub = self.create_publisher(
+            Empty, localization_reset_topic, 10
         )
         self.referee_cmd_pub = self.create_publisher(
             RefereeCmd, "/referee_system/referee_cmd", 10
@@ -126,6 +133,9 @@ class PbControlPanelPublisher(Node):
     def set_manual_posture_override(self, enabled):
         self.manual_posture_override = bool(enabled)
         self._manual_override_warning_emitted = False
+
+    def reset_localization(self):
+        self.localization_reset_pub.publish(Empty())
 
     def start_preparation(self):
         self.posture_state.reset_match()
