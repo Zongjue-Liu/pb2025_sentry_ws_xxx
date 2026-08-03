@@ -32,11 +32,13 @@ from nav2_common.launch import RewrittenYaml
 def launch_setup(context: LaunchContext) -> list:
     """
     NOTE: Using OpaqueFunction in order to get the context in string format...
+
     But it is too hacky and not recommended.
     """
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
     detector = LaunchConfiguration("detector")
+    use_projectile_motion = LaunchConfiguration("use_projectile_motion")
     params_file = LaunchConfiguration("params_file")
     use_hik_camera = LaunchConfiguration("use_hik_camera")
     use_composition = LaunchConfiguration("use_composition")
@@ -104,6 +106,7 @@ def launch_setup(context: LaunchContext) -> list:
                 arguments=["--ros-args", "--log-level", log_level],
             ),
             Node(
+                condition=IfCondition(use_projectile_motion),
                 package="projectile_motion",
                 executable="projectile_motion_node",
                 name="projectile_motion",
@@ -144,6 +147,7 @@ def launch_setup(context: LaunchContext) -> list:
                 extra_arguments=[{"use_intra_process_comms": True}],
             ),
             ComposableNode(
+                condition=IfCondition(use_projectile_motion),
                 package="projectile_motion",
                 plugin="projectile_motion::ProjectileMotionNode",
                 name="projectile_motion",
@@ -179,6 +183,12 @@ def generate_launch_description():
         "detector",
         default_value="opencv",
         description="Type of detector to use (option: 'opencv', 'openvino', 'tensorrt')",
+    )
+
+    declare_use_projectile_motion_cmd = DeclareLaunchArgument(
+        "use_projectile_motion",
+        default_value="True",
+        description="Whether to start projectile motion, gimbal, and shooting outputs",
     )
 
     declare_params_file_cmd = DeclareLaunchArgument(
@@ -224,6 +234,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_detector_cmd)
+    ld.add_action(declare_use_projectile_motion_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_use_hik_camera_cmd)
     ld.add_action(declare_use_composition_cmd)

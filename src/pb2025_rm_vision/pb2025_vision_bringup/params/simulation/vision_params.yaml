@@ -4,10 +4,14 @@ armor_detector_opencv:
     debug: true
     camera_name: "front_industrial_camera"
 
-    detect_color: 0
-    binary_thres: 80
+    detect_color: 1
+    binary_thres: 70
+    use_color_threshold: true
+    color_threshold: 40
+    use_number_classifier: false
+    fallback_number: "3"
 
-    light.min_ratio: 0.1
+    light.min_ratio: 0.06
     armor.min_light_ratio: 0.8
 
     classifier_threshold: 0.25
@@ -49,7 +53,7 @@ armor_tracker:
       max_match_distance: 0.5
       max_match_yaw_diff: 1.0
 
-      tracking_thres: 5
+      tracking_thres: 0
       lost_time_thres: 1.0
 
 projectile_motion:

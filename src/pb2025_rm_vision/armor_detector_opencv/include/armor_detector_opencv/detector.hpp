@@ -58,6 +58,10 @@ public:
 
   int binary_thres;
   int detect_color;  // 0 for red, 1 for blue
+  bool use_color_threshold;
+  int color_threshold;
+  bool use_number_classifier;
+  std::string fallback_number;
   LightParams l;
   ArmorParams a;
 

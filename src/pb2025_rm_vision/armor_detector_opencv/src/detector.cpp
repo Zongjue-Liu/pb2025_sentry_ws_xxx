@@ -21,7 +21,14 @@ namespace rm_auto_aim
 {
 Detector::Detector(
   const int & bin_thres, const int & color, const LightParams & l, const ArmorParams & a)
-: binary_thres(bin_thres), detect_color(color), l(l), a(a)
+: binary_thres(bin_thres),
+  detect_color(color),
+  use_color_threshold(false),
+  color_threshold(40),
+  use_number_classifier(true),
+  fallback_number("3"),
+  l(l),
+  a(a)
 {
 }
 
@@ -33,7 +40,15 @@ std::vector<Armor> Detector::detect(const cv::Mat & input)
 
   if (!armors_.empty()) {
     classifier->extractNumbers(input, armors_);
-    classifier->classify(armors_);
+    if (use_number_classifier) {
+      classifier->classify(armors_);
+    } else {
+      for (auto & armor : armors_) {
+        armor.number = fallback_number;
+        armor.confidence = 1.0;
+        armor.classfication_result = fallback_number + ": geometry fallback";
+      }
+    }
   }
 
   return armors_;
@@ -41,6 +56,22 @@ std::vector<Armor> Detector::detect(const cv::Mat & input)
 
 cv::Mat Detector::preprocessImage(const cv::Mat & rgb_img)
 {
+  if (use_color_threshold) {
+    std::vector<cv::Mat> channels;
+    cv::split(rgb_img, channels);
+
+    cv::Mat color_difference;
+    if (detect_color == RED) {
+      cv::subtract(channels[0], channels[2], color_difference);
+    } else {
+      cv::subtract(channels[2], channels[0], color_difference);
+    }
+
+    cv::Mat binary_img;
+    cv::threshold(color_difference, binary_img, color_threshold, 255, cv::THRESH_BINARY);
+    return binary_img;
+  }
+
   cv::Mat gray_img;
   cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
 

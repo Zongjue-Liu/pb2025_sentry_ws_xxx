@@ -32,6 +32,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
     detector = LaunchConfiguration("detector")
+    use_projectile_motion = LaunchConfiguration("use_projectile_motion")
     params_file = LaunchConfiguration("params_file")
     use_composition = LaunchConfiguration("use_composition")
     use_respawn = LaunchConfiguration("use_respawn")
@@ -58,6 +59,12 @@ def generate_launch_description():
         "detector",
         default_value="opencv",
         description="Type of detector to use (option: 'opencv', 'openvino', 'tensorrt')",
+    )
+
+    declare_use_projectile_motion_cmd = DeclareLaunchArgument(
+        "use_projectile_motion",
+        default_value="True",
+        description="Whether to start projectile motion, gimbal, and shooting outputs",
     )
 
     declare_params_file_cmd = DeclareLaunchArgument(
@@ -100,6 +107,7 @@ def generate_launch_description():
             "namespace": namespace,
             "use_sim_time": use_sim_time,
             "detector": detector,
+            "use_projectile_motion": use_projectile_motion,
             "params_file": params_file,
             "use_hik_camera": "False",
             "use_composition": use_composition,
@@ -124,6 +132,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_detector_cmd)
+    ld.add_action(declare_use_projectile_motion_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_rviz_config_file_cmd)

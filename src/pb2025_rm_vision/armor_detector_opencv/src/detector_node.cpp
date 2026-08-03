@@ -173,6 +173,14 @@ std::unique_ptr<Detector> ArmorDetectorOpencvNode::initDetector()
   param_desc.integer_range[0].to_value = 1;
   auto detect_color = declare_parameter("detect_color", RED, param_desc);
 
+  auto use_color_threshold = declare_parameter("use_color_threshold", false);
+  param_desc.description = "Minimum target-color channel difference";
+  param_desc.integer_range[0].from_value = 0;
+  param_desc.integer_range[0].to_value = 255;
+  auto color_threshold = declare_parameter("color_threshold", 40, param_desc);
+  auto use_number_classifier = declare_parameter("use_number_classifier", true);
+  auto fallback_number = declare_parameter("fallback_number", "3");
+
   Detector::LightParams l_params = {
     .min_ratio = declare_parameter("light.min_ratio", 0.1),
     .max_ratio = declare_parameter("light.max_ratio", 0.4),
@@ -187,6 +195,10 @@ std::unique_ptr<Detector> ArmorDetectorOpencvNode::initDetector()
     .max_angle = declare_parameter("armor.max_angle", 35.0)};
 
   auto detector = std::make_unique<Detector>(binary_thres, detect_color, l_params, a_params);
+  detector->use_color_threshold = use_color_threshold;
+  detector->color_threshold = color_threshold;
+  detector->use_number_classifier = use_number_classifier;
+  detector->fallback_number = fallback_number;
 
   // Init classifier
   auto pkg_path = ament_index_cpp::get_package_share_directory("armor_detector_opencv");
@@ -210,6 +222,10 @@ std::vector<Armor> ArmorDetectorOpencvNode::detectArmors(
   // Update params
   detector_->binary_thres = get_parameter("binary_thres").as_int();
   detector_->detect_color = get_parameter("detect_color").as_int();
+  detector_->use_color_threshold = get_parameter("use_color_threshold").as_bool();
+  detector_->color_threshold = get_parameter("color_threshold").as_int();
+  detector_->use_number_classifier = get_parameter("use_number_classifier").as_bool();
+  detector_->fallback_number = get_parameter("fallback_number").as_string();
   detector_->classifier->threshold = get_parameter("classifier_threshold").as_double();
 
   auto armors = detector_->detect(img);
