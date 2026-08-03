@@ -31,6 +31,7 @@ def generate_launch_description():
     # Create the launch configuration variables
     namespace = LaunchConfiguration("namespace")
     rviz_config_file = LaunchConfiguration("rviz_config")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     # Declare the launch arguments
     declare_namespace_cmd = DeclareLaunchArgument(
@@ -40,6 +41,12 @@ def generate_launch_description():
             "Top-level namespace. The value will be used to replace the "
             "<robot_namespace> keyword on the RViz config file."
         ),
+    )
+
+    declare_use_sim_time_cmd = DeclareLaunchArgument(
+        "use_sim_time",
+        default_value="False",
+        description="Use simulation clock if True",
     )
 
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
@@ -54,6 +61,7 @@ def generate_launch_description():
         executable="rviz2",
         namespace=namespace,
         arguments=["-d", rviz_config_file],
+        parameters=[{"use_sim_time": use_sim_time}],
         output="screen",
         remappings=[
             ("/tf", "tf"),
@@ -73,6 +81,7 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
+    ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_rviz_config_file_cmd)
 
     # Add any conditioned actions
