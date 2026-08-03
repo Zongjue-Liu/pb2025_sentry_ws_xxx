@@ -8,32 +8,40 @@
             <IsGameStatus name="IsGameStart"
                           expected_game_progress="4"
                           min_remain_time="0"
-                          max_remain_time="420"
+                          max_remain_time="300"
                           key_port="{@referee_gameStatus}"/>
-            <ForceFailure>
-              <Sequence name="StopBeforeGameStart">
-                <PublishSpinSpeed spin_speed="0.0"
-                                  duration="0.0"
-                                  topic_name="cmd_spin"/>
-                <PublishTwist v_x="0.0"
-                              v_y="0.0"
-                              v_yaw="0.0"
-                              duration="0.0"
-                              topic_name="cmd_vel"/>
-              </Sequence>
-            </ForceFailure>
+            <AlwaysFailure/>
           </ReactiveFallback>
+
+          <ReactiveFallback name="EmergencyStopGuard">
+            <Inverter>
+              <IsEmergencyStop emergency_stop="{@referee_emergencyStop}"/>
+            </Inverter>
+            <AlwaysFailure/>
+          </ReactiveFallback>
+
+          <ForceSuccess name="InitializeMotionEpoch">
+            <Fallback>
+              <RunOncePerEpoch epoch="{@motion_epoch}">
+                <Sequence>
+                  <PublishSpinSpeed spin_speed="5.0"
+                                    duration="0.0"
+                                    topic_name="cmd_spin"/>
+                  <PubNav2Goal goal="4.8;-3.5;0.0"
+                               topic_name="goal_pose"/>
+                </Sequence>
+              </RunOncePerEpoch>
+              <AlwaysFailure/>
+            </Fallback>
+          </ForceSuccess>
 
           <ReactiveFallback name="ConservativeStatusGuard">
             <IsStatusOK hp_min="280"
-                        heat_max="330"
+                        heat_max="215"
                         ammo_min="10"
                         key_port="{@referee_robotStatus}"/>
             <ForceFailure>
               <Sequence name="ReturnHomeIfUnsafe">
-                <PublishSpinSpeed spin_speed="5.0"
-                                  duration="0.0"
-                                  topic_name="cmd_spin"/>
                 <PubNav2Goal goal="0.0;0.0;0.0"
                              topic_name="goal_pose"/>
               </Sequence>
@@ -41,36 +49,22 @@
           </ReactiveFallback>
 
           <ReactiveFallback name="ConservativeULStrategy">
-            <Sequence name="LeaveStartArea">
-              <IsGameStatus expected_game_progress="4"
-                            min_remain_time="400"
-                            max_remain_time="420"
-                            key_port="{@referee_gameStatus}"/>
-              <PublishSpinSpeed spin_speed="5.0"
-                                duration="0.0"
-                                topic_name="cmd_spin"/>
-              <PubNav2Goal goal="1.0;0.0;0.0"
-                           topic_name="goal_pose"/>
-            </Sequence>
-
-            <Sequence name="OccupyBuffWindow">
+            <Sequence name="ControlZoneWindow">
               <IsGameStatus expected_game_progress="4"
                             min_remain_time="230"
                             max_remain_time="250"
                             key_port="{@referee_gameStatus}"/>
-              <PublishSpinSpeed spin_speed="5.0"
-                                duration="0.0"
-                                topic_name="cmd_spin"/>
-              <PubNav2Goal goal="1.59;-0.771;0.0"
+              <PubNav2Goal goal="4.8;-3.5;0.0"
                            topic_name="goal_pose"/>
             </Sequence>
 
             <Sequence name="AttackOnlyNearEnemy">
               <IsDetectEnemy max_distance="2.0"
+                             lost_timeout="0.0"
+                             message_timeout="0.5"
+                             detector_sequence="{@detector_sequence}"
+                             motion_epoch="{@motion_epoch}"
                              key_port="{@detector_armors}"/>
-              <PublishSpinSpeed spin_speed="5.0"
-                                duration="0.0"
-                                topic_name="cmd_spin"/>
               <ReactiveFallback>
                 <Sequence>
                   <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
@@ -80,16 +74,13 @@
                   <PubNav2Goal goal="{attack_pose}"
                                topic_name="goal_pose"/>
                 </Sequence>
-                <PubNav2Goal goal="0.0;0.0;0.0"
+                <PubNav2Goal goal="4.8;-3.5;0.0"
                              topic_name="goal_pose"/>
               </ReactiveFallback>
             </Sequence>
 
             <Sequence name="DefensePatrolDefault">
-              <PublishSpinSpeed spin_speed="5.0"
-                                duration="0.0"
-                                topic_name="cmd_spin"/>
-              <PubNav2Goal goal="0.0;0.0;0.0"
+              <PubNav2Goal goal="4.8;-3.5;0.0"
                            topic_name="goal_pose"/>
             </Sequence>
           </ReactiveFallback>

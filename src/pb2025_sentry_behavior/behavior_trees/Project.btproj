@@ -9,7 +9,7 @@
       <input_port name="key_port" default="{@referee_gameStatus}" type="pb_rm_interfaces::msg::GameStatus"/>
       <input_port name="expected_game_progress" default="4" type="int"/>
       <input_port name="min_remain_time" default="0" type="int"/>
-      <input_port name="max_remain_time" default="420" type="int"/>
+      <input_port name="max_remain_time" default="300" type="int"/>
     </Condition>
 
     <Condition ID="IsStatusOK">
@@ -23,7 +23,20 @@
       <input_port name="key_port" default="{@detector_armors}" type="auto_aim_interfaces::msg::Armors"/>
       <input_port name="armor_id" default="1;2;3;4;5;7" type="std::vector&lt;int&gt;"/>
       <input_port name="max_distance" default="8.0" type="float"/>
+      <input_port name="lost_timeout" default="0.0" type="float"/>
+      <input_port name="message_timeout" default="0.5" type="float"/>
+      <input_port name="minimum_detection_time" default="0.0" type="float"/>
+      <input_port name="detector_sequence" default="{@detector_sequence}" type="uint64_t"/>
+      <input_port name="motion_epoch" default="{@motion_epoch}" type="uint64_t"/>
     </Condition>
+
+    <Condition ID="IsEmergencyStop">
+      <input_port name="emergency_stop" default="{@referee_emergencyStop}" type="bool"/>
+    </Condition>
+
+    <Decorator ID="RunOncePerEpoch">
+      <input_port name="epoch" default="{@motion_epoch}" type="uint64_t"/>
+    </Decorator>
 
     <Condition ID="IsRfidDetected">
       <input_port name="key_port" default="{@referee_rfidStatus}" type="pb_rm_interfaces::msg::RfidStatus"/>
