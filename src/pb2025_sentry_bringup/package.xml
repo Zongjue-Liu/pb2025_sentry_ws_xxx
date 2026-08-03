@@ -14,6 +14,8 @@
   <exec_depend>pb2025_vision_bringup</exec_depend>
   <exec_depend>pb2025_nav_bringup</exec_depend>
   <exec_depend>pb2025_sentry_behavior</exec_depend>
+  <exec_depend>pb_control_panel</exec_depend>
+  <exec_depend>rmu_gazebo_simulator</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

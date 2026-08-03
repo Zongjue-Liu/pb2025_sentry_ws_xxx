@@ -15,6 +15,7 @@
 #ifndef FAKE_VEL_TRANSFORM__FAKE_VEL_TRANSFORM_HPP_
 #define FAKE_VEL_TRANSFORM__FAKE_VEL_TRANSFORM_HPP_
 
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -26,7 +27,9 @@
 #include "message_filters/synchronizer.h"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "pb_rm_interfaces/msg/game_status.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 namespace fake_vel_transform
@@ -44,12 +47,17 @@ private:
   void localPlanCallback(const nav_msgs::msg::Path::ConstSharedPtr & msg);
   void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void cmdSpinCallback(example_interfaces::msg::Float32::SharedPtr msg);
+  void gameStatusCallback(pb_rm_interfaces::msg::GameStatus::SharedPtr msg);
+  void emergencyStopCallback(std_msgs::msg::Bool::SharedPtr msg);
   void publishTransform();
+  void publishVelocity();
   geometry_msgs::msg::Twist transformVelocity(
-    const geometry_msgs::msg::Twist::SharedPtr & twist, float yaw_diff);
+    const geometry_msgs::msg::Twist & twist, float yaw_diff) const;
 
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<example_interfaces::msg::Float32>::SharedPtr cmd_spin_sub_;
+  rclcpp::Subscription<pb_rm_interfaces::msg::GameStatus>::SharedPtr game_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr emergency_stop_sub_;
 
   message_filters::Subscriber<nav_msgs::msg::Odometry> odom_sub_filter_;
   message_filters::Subscriber<nav_msgs::msg::Path> local_plan_sub_filter_;
@@ -61,7 +69,8 @@ private:
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr transform_timer_;
+  rclcpp::TimerBase::SharedPtr velocity_timer_;
 
   std::string robot_base_frame_;
   std::string fake_robot_base_frame_;
@@ -70,12 +79,22 @@ private:
   std::string cmd_spin_topic_;
   std::string input_cmd_vel_topic_;
   std::string output_cmd_vel_topic_;
-  float spin_speed_;
+  std::string game_status_topic_;
+  std::string emergency_stop_topic_;
+  double cmd_vel_timeout_;
+  double referee_timeout_;
+  double output_frequency_;
+  float spin_speed_{0.0F};
 
-  std::mutex cmd_vel_mutex_;
+  std::mutex state_mutex_;
   geometry_msgs::msg::Twist::SharedPtr latest_cmd_vel_;
-  double current_robot_base_angle_;
-  rclcpp::Time last_controller_activate_time_;
+  double current_robot_base_angle_{0.0};
+  bool game_running_{false};
+  bool emergency_stop_{false};
+  bool has_game_status_{false};
+  std::chrono::steady_clock::time_point last_cmd_vel_time_;
+  std::chrono::steady_clock::time_point last_game_status_time_;
+  std::chrono::steady_clock::time_point last_controller_activate_time_;
 };
 
 }  // namespace fake_vel_transform

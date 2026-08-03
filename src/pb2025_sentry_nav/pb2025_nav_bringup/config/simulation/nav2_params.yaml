@@ -154,8 +154,13 @@ fake_vel_transform:
     fake_robot_base_frame: "gimbal_yaw_fake"
     input_cmd_vel_topic: "cmd_vel_nav2_result"
     output_cmd_vel_topic: "cmd_vel"
-    cmd_spin_topic: "cmd_spin"
-    init_spin_speed: 3.14
+    cmd_spin_topic: "/cmd_spin"
+    game_status_topic: "/referee/game_status"
+    emergency_stop_topic: "/referee/emergency_stop"
+    init_spin_speed: 0.0
+    cmd_vel_timeout: 0.3
+    referee_timeout: 2.0
+    output_frequency: 50.0
 
 small_gicp_relocalization:
   ros__parameters:
