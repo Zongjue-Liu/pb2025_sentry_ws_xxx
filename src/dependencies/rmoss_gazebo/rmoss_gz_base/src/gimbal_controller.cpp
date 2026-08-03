@@ -25,6 +25,7 @@ GimbalController::GimbalController(
   rclcpp::Node::SharedPtr node,
   Actuator<rmoss_interfaces::msg::Gimbal>::SharedPtr gimbal_vel_actuator,
   Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr gimbal_pos_sensor,
+  Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr relative_gimbal_pos_sensor,
   const std::string & controller_name)
 : node_(node), gimbal_vel_actuator_(gimbal_vel_actuator), gimbal_pos_sensor_(gimbal_pos_sensor)
 {
@@ -33,6 +34,8 @@ GimbalController::GimbalController(
   declare_pid_parameter(node_, controller_name + ".yaw_pid");
   get_pid_parameter(node_, controller_name + ".pitch_pid", picth_pid_param_);
   get_pid_parameter(node_, controller_name + ".yaw_pid", yaw_pid_param_);
+  node_->declare_parameter(controller_name + ".follow_chassis", follow_chassis_);
+  node_->get_parameter(controller_name + ".follow_chassis", follow_chassis_);
   set_pitch_pid(picth_pid_param_);
   set_yaw_pid(yaw_pid_param_);
   // sensor callback
@@ -40,6 +43,10 @@ GimbalController::GimbalController(
     [this](const rmoss_interfaces::msg::Gimbal & data, const rclcpp::Time & /*stamp*/) {
       cur_yaw_ = data.yaw;
       cur_pitch_ = data.pitch;
+    });
+  relative_gimbal_pos_sensor->add_callback(
+    [this](const rmoss_interfaces::msg::Gimbal & data, const rclcpp::Time & /*stamp*/) {
+      cur_relative_yaw_ = data.yaw;
     });
   // ros pub and sub
   using namespace std::placeholders;
@@ -71,7 +78,7 @@ void GimbalController::update()
   double pitch_err = cur_pitch_ - target_pitch_;
   cmd.pitch = picth_pid_.Update(pitch_err, pid_period_);
   // pid for yaw
-  double yaw_err = cur_yaw_ - target_yaw_;
+  double yaw_err = follow_chassis_ ? cur_relative_yaw_ : cur_yaw_ - target_yaw_;
   cmd.yaw = yaw_pid_.Update(yaw_err, pid_period_);
   // set CMD
   gimbal_vel_actuator_->set(cmd);
@@ -119,9 +126,14 @@ void GimbalController::gimbal_cb(const rmoss_interfaces::msg::GimbalCmd::SharedP
   target_pitch_ = std::max(target_pitch_, -1.0);
   // for yaw
   if (msg->yaw_type == msg->ABSOLUTE_ANGLE) {
+    follow_chassis_ = false;
     target_yaw_ = msg->position.yaw;
   } else if (msg->yaw_type == msg->RELATIVE_ANGLE) {
+    follow_chassis_ = false;
     target_yaw_ = cur_yaw_ + msg->position.yaw;
+  } else if (msg->yaw_type == msg->FOLLOW_CHASSIS) {
+    follow_chassis_ = true;
+    yaw_pid_.Reset();
   } else {
     RCLCPP_WARN(node_->get_logger(), "yaw cmd type[%d] isn't supported!", msg->yaw_type);
   }

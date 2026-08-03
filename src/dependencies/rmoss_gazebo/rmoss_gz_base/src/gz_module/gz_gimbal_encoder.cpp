@@ -22,6 +22,11 @@
 namespace rmoss_gz_base
 {
 
+namespace
+{
+constexpr double kTwoPi = 6.28318530717958647692;
+}
+
 IgnGimbalEncoder::IgnGimbalEncoder(
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<ignition::transport::Node> gz_node,
@@ -31,6 +36,7 @@ IgnGimbalEncoder::IgnGimbalEncoder(
   gz_node_->Subscribe(gz_joint_state_topic, &IgnGimbalEncoder::gz_Joint_state_cb, this);
   position_sensor_ = std::make_shared<DataSensor<rmoss_interfaces::msg::Gimbal>>();
   velocity_sensor_ = std::make_shared<DataSensor<rmoss_interfaces::msg::Gimbal>>();
+  relative_position_sensor_ = std::make_shared<DataSensor<rmoss_interfaces::msg::Gimbal>>();
 }
 
 void IgnGimbalEncoder::gz_Joint_state_cb(const ignition::msgs::Model & msg)
@@ -38,7 +44,7 @@ void IgnGimbalEncoder::gz_Joint_state_cb(const ignition::msgs::Model & msg)
   if (!enable_) {
     return;
   }
-  rmoss_interfaces::msg::Gimbal position, velocity;
+  rmoss_interfaces::msg::Gimbal position, velocity, relative_position;
   for (int i = 0; i < msg.joint_size(); i++) {
     if (msg.joint(i).name().find("gimbal_pitch_odom_joint") != std::string::npos) {
       position.pitch += msg.joint(i).axis1().position();
@@ -47,18 +53,23 @@ void IgnGimbalEncoder::gz_Joint_state_cb(const ignition::msgs::Model & msg)
     if (msg.joint(i).name().find("gimbal_yaw_odom_joint") != std::string::npos) {
       position.yaw += msg.joint(i).axis1().position();
       velocity.yaw += msg.joint(i).axis1().velocity();
+      relative_position.yaw += msg.joint(i).axis1().position();
     }
     if (msg.joint(i).name().find("gimbal_pitch_joint") != std::string::npos) {
       position.pitch += msg.joint(i).axis1().position();
       velocity.pitch += msg.joint(i).axis1().velocity();
+      relative_position.pitch = msg.joint(i).axis1().position();
     }
     if (msg.joint(i).name().find("gimbal_yaw_joint") != std::string::npos) {
       position.yaw += msg.joint(i).axis1().position();
       velocity.yaw += msg.joint(i).axis1().velocity();
+      relative_position.yaw += msg.joint(i).axis1().position();
     }
   }
+  relative_position.yaw = std::remainder(relative_position.yaw, kTwoPi);
   position_sensor_->update(position, node_->get_clock()->now());
   velocity_sensor_->update(velocity, node_->get_clock()->now());
+  relative_position_sensor_->update(relative_position, node_->get_clock()->now());
 }
 
 

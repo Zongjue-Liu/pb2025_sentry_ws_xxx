@@ -35,6 +35,7 @@ public:
     rclcpp::Node::SharedPtr node,
     Actuator<rmoss_interfaces::msg::Gimbal>::SharedPtr gimbal_vel_actuator,
     Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr gimbal_pos_sensor,
+    Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr relative_gimbal_pos_sensor,
     const std::string & controller_name = "gimbal_controller");
   ~GimbalController() {}
 
@@ -68,6 +69,7 @@ private:
   double target_yaw_{0};
   double cur_pitch_{0};
   double cur_yaw_{0};
+  double cur_relative_yaw_{0};
   // pid and pid parameter
   PidParam picth_pid_param_;
   PidParam yaw_pid_param_;
@@ -75,6 +77,7 @@ private:
   ignition::math::PID yaw_pid_;
   std::chrono::nanoseconds pid_period_;
   // flag
+  bool follow_chassis_{false};
   bool update_pid_flag_{true};
 };
 

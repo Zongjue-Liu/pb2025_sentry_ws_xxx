@@ -17,21 +17,28 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 
 
-def generate_launch_description():
-    pkg_simulator = get_package_share_directory("rmu_gazebo_simulator")
+def launch_setup(context, pkg_simulator, gz_world_path):
+    selected_world = LaunchConfiguration("world").perform(context)
+    spawn_delay = LaunchConfiguration("spawn_delay")
 
-    gz_world_path = os.path.join(pkg_simulator, "config", "gz_world.yaml")
     with open(gz_world_path) as file:
         config = yaml.safe_load(file)
-        selected_world = config.get("world")
+    if selected_world not in config.get("robots", {}):
+        raise RuntimeError("Unknown simulation world: {}".format(selected_world))
 
     world_sdf_path = os.path.join(
         pkg_simulator, "resource", "worlds", f"{selected_world}_world.sdf"
     )
+    if not os.path.exists(world_sdf_path):
+        raise RuntimeError("World file does not exist: {}".format(world_sdf_path))
     ign_config_path = os.path.join(pkg_simulator, "resource", "ign", "gui.config")
 
     gazebo_launch = IncludeLaunchDescription(
@@ -43,7 +50,6 @@ def generate_launch_description():
             "ign_config_path": ign_config_path,
         }.items(),
     )
-
     spawn_robots_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_simulator, "launch", "spawn_robots.launch.py")
@@ -53,17 +59,47 @@ def generate_launch_description():
             "world": selected_world,
         }.items(),
     )
-
     referee_system_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_simulator, "launch", "referee_system.launch.py")
         )
     )
+    return [
+        gazebo_launch,
+        TimerAction(period=spawn_delay, actions=[spawn_robots_launch]),
+        referee_system_launch,
+    ]
+
+
+def generate_launch_description():
+    pkg_simulator = get_package_share_directory("rmu_gazebo_simulator")
+
+    gz_world_path = os.path.join(pkg_simulator, "config", "gz_world.yaml")
+    with open(gz_world_path) as file:
+        config = yaml.safe_load(file)
+    default_world = config.get("world")
 
     ld = LaunchDescription()
 
-    ld.add_action(gazebo_launch)
-    ld.add_action(spawn_robots_launch)
-    ld.add_action(referee_system_launch)
+    ld.add_action(
+        DeclareLaunchArgument(
+            "world",
+            default_value=default_world,
+            description="Simulation world and robot spawn configuration",
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            "spawn_delay",
+            default_value="15.0",
+            description="Delay robot spawning until the Gazebo GUI scene is ready",
+        )
+    )
+    ld.add_action(
+        OpaqueFunction(
+            function=launch_setup,
+            args=[pkg_simulator, gz_world_path],
+        )
+    )
 
     return ld

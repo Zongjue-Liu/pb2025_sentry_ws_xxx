@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import termios
+import time
 import tty
 
 import rclpy
@@ -47,35 +48,43 @@ def main():
     node.declare_parameter('w',1.0)
     v=node.get_parameter('v').value
     w=node.get_parameter('w').value
-    pub = node.create_publisher(ChassisCmd, 'chassis_cmd', 10)
+    pub = node.create_publisher(ChassisCmd, 'robot_base/chassis_cmd', 10)
     print("node params v:%f,w:%f"%(v,w))
     print(msg)
     vel_x=vel_y=vel_w=0.0
     chassis_type = 1
-    while True:
-        key=getKey(settings)
-        if key == 'w':
-            vel_x=1.0 * v
-        elif key == 's':
-            vel_x=-1.0 * v
-        elif key == 'a':
-            vel_y=1.0 * v
-        elif key == 'd':
-            vel_y=-1.0 * v
-        elif key == '[':
-            vel_w=1.0 * w
-        elif key == ']':
-            vel_w=-1.0 * w
-        elif key == ' ':
-            vel_x=vel_y=vel_w=0.0
-        elif key == 'z':
-            chassis_type = 1
-        elif key == 'x':
-            chassis_type = 2
-        elif key == '\x03':
-            break
-        info=getChassisContolMsg(vel_x,vel_y,vel_w,chassis_type)
-        pub.publish(info)
+    try:
+        while rclpy.ok():
+            key=getKey(settings)
+            if key == 'w':
+                vel_x=-1.0 * v
+            elif key == 's':
+                vel_x=1.0 * v
+            elif key == 'a':
+                vel_y=-1.0 * v
+            elif key == 'd':
+                vel_y=1.0 * v
+            elif key == '[':
+                vel_w=1.0 * w
+            elif key == ']':
+                vel_w=-1.0 * w
+            elif key == ' ':
+                vel_x=vel_y=vel_w=0.0
+            elif key == 'z':
+                chassis_type = 1
+            elif key == 'x':
+                chassis_type = 2
+            elif key == '\x03':
+                break
+            info=getChassisContolMsg(vel_x,vel_y,vel_w,chassis_type)
+            pub.publish(info)
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+        pub.publish(getChassisContolMsg(0.0, 0.0, 0.0, chassis_type))
+        time.sleep(0.1)
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

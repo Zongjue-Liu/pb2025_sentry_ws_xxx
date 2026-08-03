@@ -8,8 +8,10 @@
  *  If not, see <https://opensource.org/licenses/MIT/>.
  *
  ******************************************************************************/
-#include <mutex>
+#include <cstdint>
 #include <map>
+#include <mutex>
+#include <string>
 #include <ignition/common/Util.hh>
 #include <ignition/plugin/Register.hh>
 #include <ignition/transport/Node.hh>
@@ -70,11 +72,14 @@ struct VisualEntityInfo {
     Entity entity;
     Entity parentEntity;
     sdf::Visual visualSdf;
+    std::string baseName;
+    std::uint64_t revision{0};
     int state;
     VisualEntityInfo(Entity _entity,Entity parentEntity,sdf::Visual &_visualSdf,int _state)
         : entity(_entity)
         , parentEntity(parentEntity)
         , visualSdf(_visualSdf)
+        , baseName(_visualSdf.Name())
         , state(_state)
     {
     }
@@ -228,6 +233,8 @@ void LightBarControllerPrivate::UpdateVisualEnitiies(){
         if(info.state == 0){
             this->creator->RequestRemoveEntity(info.entity);
         }else if(info.state == 1){
+            info.visualSdf.SetName(
+                info.baseName + "_state_" + std::to_string(++info.revision));
             info.entity = this->creator->CreateEntities(&(info.visualSdf));
             this->creator->SetParent(info.entity , info.parentEntity);
         }

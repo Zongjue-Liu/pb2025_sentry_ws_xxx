@@ -63,7 +63,8 @@ Rmua19RobotBaseNode::Rmua19RobotBaseNode(const rclcpp::NodeOptions & options)
   chassis_controller_ = std::make_shared<rmoss_gz_base::ChassisController>(
     node_, chassis_actuator_, gz_gimbal_encoder_->get_position_sensor());
   gimbal_controller_ = std::make_shared<rmoss_gz_base::GimbalController>(
-    node_, gimbal_vel_actuator_, gz_gimbal_imu_->get_position_sensor());
+    node_, gimbal_vel_actuator_, gz_gimbal_imu_->get_position_sensor(),
+    gz_gimbal_encoder_->get_relative_position_sensor());
   shooter_controller_ = std::make_shared<rmoss_gz_base::ShooterController>(
     node_, shoot_actuator_, "small_shooter_controller");
   // odometry

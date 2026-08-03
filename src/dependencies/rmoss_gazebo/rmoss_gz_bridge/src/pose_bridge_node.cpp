@@ -35,13 +35,14 @@ PoseBridgeNode::PoseBridgeNode(const rclcpp::NodeOptions & options)
   node_->get_parameter("robot_filter", robot_filter_);
   std::string gz_topic = "/world/" + world_name + "/dynamic_pose/info";
   gz_service_name_ = "/world/" + world_name + "/set_pose";
-  // get pose from ignition gazebo
-  gz_node_->Subscribe(gz_topic, &PoseBridgeNode::gz_pose_cb, this);
+
+  // Create ROS interfaces before the Gazebo subscription can invoke its callback.
   pose_pub_ = node_->create_publisher<tf2_msgs::msg::TFMessage>("/referee_system/pose_info", 10);
-  // set pose to ignition gazebo
   using namespace std::placeholders;
   set_pose_sub_ = node_->create_subscription<geometry_msgs::msg::TransformStamped>(
     "/referee_system/set_pose", 10, std::bind(&PoseBridgeNode::set_pose_cb, this, _1));
+
+  gz_node_->Subscribe(gz_topic, &PoseBridgeNode::gz_pose_cb, this);
 }
 
 void PoseBridgeNode::gz_pose_cb(const ignition::msgs::Pose_V & msg)

@@ -41,6 +41,10 @@ public:
   void enable(bool enable) {enable_ = enable;}
   Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr get_position_sensor() {return position_sensor_;}
   Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr get_velocity_sensor() {return velocity_sensor_;}
+  Sensor<rmoss_interfaces::msg::Gimbal>::SharedPtr get_relative_position_sensor()
+  {
+    return relative_position_sensor_;
+  }
 
 private:
   void gz_Joint_state_cb(const ignition::msgs::Model & msg);
@@ -51,6 +55,7 @@ private:
   // info
   std::shared_ptr<DataSensor<rmoss_interfaces::msg::Gimbal>> position_sensor_;
   std::shared_ptr<DataSensor<rmoss_interfaces::msg::Gimbal>> velocity_sensor_;
+  std::shared_ptr<DataSensor<rmoss_interfaces::msg::Gimbal>> relative_position_sensor_;
 };
 
 

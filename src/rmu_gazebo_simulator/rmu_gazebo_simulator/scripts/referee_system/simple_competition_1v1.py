@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2021 Zhenpeng Ge
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -309,20 +310,30 @@ class SimpleRefereeSystem:
             robot.publish_status()
 
     def referee_cmd_callback(self, msg: RefereeCmd):
-        if msg.cmd == msg.PREPARATION:
+        spawned_robots = {
+            name: robot
+            for name, robot in self.robots.items()
+            if robot.initial_tf is not None
+        }
+
+        if msg.cmd == msg.START_PREPARATION:
             self.game_over = True
-            for robot in self.robots.values():
+            missing_robots = sorted(set(self.robots) - set(spawned_robots))
+            for robot_name in missing_robots:
+                self.node.get_logger().warning(
+                    f"Skipping reset for robot without an initial pose: {robot_name}"
+                )
+            for robot in spawned_robots.values():
                 robot.enable_power(False)
-            for robot_name, robot in self.robots.items():
-                assert robot.initial_tf is not None
-                msg = TransformStamped()
-                msg.child_frame_id = robot_name
-                msg.transform = robot.initial_tf
-                self.set_pose_pub.publish(msg)
+            for robot_name, robot in spawned_robots.items():
+                pose_msg = TransformStamped()
+                pose_msg.child_frame_id = robot_name
+                pose_msg.transform = robot.initial_tf
+                self.set_pose_pub.publish(pose_msg)
                 time.sleep(0.05)
-            for robot in self.robots.values():
+            for robot in spawned_robots.values():
                 robot.enable_power(True)
-        elif msg.cmd == msg.SELF_CHECKING:
+        elif msg.cmd == msg.START_SELF_CHECKING:
             self.game_over = False
             self.red_resources = self.initial_resources
             self.blue_resources = self.initial_resources
