@@ -16,6 +16,7 @@ __pycache__
 
 *~
 *.pcd
+!pb2025_nav_bringup/pcd/simulation/rmul_2027_3v3.pcd
 *.gv
 *.pdf
 
